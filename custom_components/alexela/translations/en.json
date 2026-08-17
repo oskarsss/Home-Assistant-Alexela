@@ -1,0 +1,38 @@
+{
+  "title": "Alexela",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect Alexela",
+        "description": "Enter the CRM ID from the Alexela API URL and a current portal bearer token. The integration will take over refreshing the token chain.",
+        "data": {
+          "crm_id": "CRM ID",
+          "token": "Bearer token"
+        },
+        "data_description": {
+          "crm_id": "Use the CRM ID from the portal API URL. The same number appears twice after /api/.",
+          "token": "Paste either the raw JWT or the full value beginning with 'Bearer '."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnect Alexela",
+        "description": "The stored Alexela token is no longer valid. Paste a fresh bearer token from my.alexela.lv.",
+        "data": {
+          "token": "Bearer token"
+        },
+        "data_description": {
+          "token": "Paste either the raw JWT or the full value beginning with 'Bearer '."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to Alexela.",
+      "invalid_auth": "The CRM ID or bearer token is not valid.",
+      "unknown": "Unexpected error. Check the Home Assistant log for details."
+    },
+    "abort": {
+      "already_configured": "This Alexela CRM ID is already configured.",
+      "reauth_successful": "Alexela authentication was updated successfully."
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "domain": "alexela",
+  "name": "Alexela",
+  "version": "0.1.2",
+  "codeowners": [
+    "@oskars"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/oskars/Home-Assistant-Alexela",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "issue_tracker": "https://github.com/oskars/Home-Assistant-Alexela/issues"
+}
