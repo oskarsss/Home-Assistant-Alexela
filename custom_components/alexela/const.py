@@ -19,3 +19,11 @@ REQUEST_TIMEOUT = 30
 # lookup is anchored on yesterday instead of today. Without this the first day
 # of a month (and of a year) would ask for a period Alexela has no data for.
 DATA_LAG = timedelta(days=1)
+
+# Alexela reports timestamps in Latvian local time without an offset.
+PORTAL_TIME_ZONE = "Europe/Riga"
+
+# Statistics are imported one day per request. Cap how many days a single
+# update may backfill so a long gap does not hammer the portal in one go;
+# the remaining days are picked up by later updates.
+MAX_BACKFILL_DAYS = 40

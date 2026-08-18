@@ -16,6 +16,8 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   - Electricity cost YTD (`EUR`)
   - Electricity cost this month (`EUR`)
   - Electricity price this month (`EUR/kWh`)
+- Imports Alexela's published 15-minute readings into hourly Home Assistant
+  long-term statistics for historical Energy Dashboard data.
 - Supports Home Assistant reauthentication if the stored JWT becomes invalid.
 
 ## Installation
@@ -104,11 +106,14 @@ logger:
 
 For **Grid consumption**, select:
 
-- **Alexela Electricity consumption YTD** as the energy-consumption statistic.
+- **Alexela electricity** (`alexela:<CRM ID>_electricity_energy`) for accurate
+  historical hourly consumption. The integration backfills up to 40 published
+  days per update and continues on later updates until caught up.
 
 For cost configuration, use one of the following approaches:
 
-- **Total costs** -> select **Alexela Electricity cost YTD** (`EUR`).
+- **Total costs** -> select **Alexela electricity cost**
+  (`alexela:<CRM ID>_electricity_cost`) for historical hourly costs.
 - **Current price** -> select **Alexela Electricity price this month** (`EUR/kWh`).
 
 Do not select an `EUR` total-cost sensor in the **current price** field. Home Assistant expects a price-per-energy unit such as `EUR/kWh` there.
@@ -147,9 +152,11 @@ The integration cannot create a new Alexela login session from username/password
 
 - Uses an undocumented private Alexela API.
 - Targets the Latvia Alexela portal/API behavior tested for this integration.
-- Consumption data is a day or more behind, and monthly rather than hourly.
+- Consumption data is a day or more behind. Summary sensors are monthly; the
+  imported long-term statistics are hourly totals built from 15-minute data.
 - Does not perform a fresh Alexela login.
-- Does not backfill historical Home Assistant long-term statistics.
+- Backfill is limited to 40 days per update to avoid overwhelming the private
+  API. Empty successful responses pause the import and are retried later.
 - Exposes aggregate electricity data rather than a device per contract/consumption location.
 - Gas consumption is not exposed yet.
 - Alexela can change the API without notice.

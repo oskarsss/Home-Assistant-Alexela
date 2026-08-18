@@ -153,13 +153,19 @@ class AlexelaApi:
         except (TimeoutError, ClientError) as err:
             raise AlexelaConnectionError(str(err)) from err
 
-    async def async_get_consumption(self, year: int) -> dict[str, Any]:
-        """Return yearly electricity/gas consumption data."""
+    async def async_get_consumption(
+        self, period_start: str, period_type: str = "year"
+    ) -> dict[str, Any]:
+        """Return electricity/gas consumption for one period.
+
+        periodType "year" gives monthly rows, "month" daily rows and "day"
+        15-minute rows.
+        """
         data = await self._get_json(
             "/consumption",
             params={
-                "periodStart": f"{year}-01-01 00:00:00",
-                "periodType": "year",
+                "periodStart": period_start,
+                "periodType": period_type,
                 "crmId": self.crm_id,
             },
         )

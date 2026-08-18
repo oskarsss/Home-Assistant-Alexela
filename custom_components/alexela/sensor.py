@@ -22,36 +22,10 @@ from homeassistant.util import dt as dt_util
 
 from . import AlexelaConfigEntry
 from .const import CONF_CRM_ID, DOMAIN
-from .coordinator import AlexelaCoordinator, reference_datetime
+from .coordinator import AlexelaCoordinator
+from .parsing import reference_datetime, sum_rows, total_block
 
 ValueFn = Callable[[dict[str, Any]], float | Decimal | None]
-
-
-def _total_block(data: dict[str, Any]) -> dict[str, Any] | None:
-    """Return Alexela's aggregate electricity block.
-
-    Accounts with a single consumption location do not always get an aggregate
-    row flagged with isTotal, so fall back to the only block that is present.
-    """
-    blocks = [
-        item for item in data.get("electricityConsumption", []) if isinstance(item, dict)
-    ]
-    for item in blocks:
-        if item.get("isTotal") is True:
-            return item
-    return blocks[0] if len(blocks) == 1 else None
-
-
-def _sum_rows(block: dict[str, Any] | None, key: str) -> float | None:
-    """Sum one field across every period of a block."""
-    if not block:
-        return None
-    values = [
-        float(row[key])
-        for row in block.get("data", [])
-        if isinstance(row, dict) and row.get(key) is not None
-    ]
-    return sum(values) if values else None
 
 
 def _period_block(data: dict[str, Any]) -> dict[str, Any] | None:
@@ -61,7 +35,7 @@ def _period_block(data: dict[str, Any]) -> dict[str, Any] | None:
     for the current month can be missing entirely. Take the newest row that is
     not in the future instead of insisting on an exact match for today.
     """
-    total = _total_block(data)
+    total = total_block(data)
     if not total:
         return None
 
@@ -92,11 +66,11 @@ def _period_start(data: dict[str, Any]) -> datetime | None:
 
 
 def _ytd_energy(data: dict[str, Any]) -> float | None:
-    total = _total_block(data)
+    total = total_block(data)
     value = total.get("totalAmount") if total else None
     if value is None:
         # A non-aggregate block has no yearly total; add the months up instead.
-        return _sum_rows(total, "amount")
+        return sum_rows(total, "amount")
     return float(value)
 
 
@@ -107,10 +81,10 @@ def _month_energy(data: dict[str, Any]) -> float | None:
 
 
 def _ytd_cost(data: dict[str, Any]) -> float | None:
-    total = _total_block(data)
+    total = total_block(data)
     value = total.get("totalPriceWithVat") if total else None
     if value is None:
-        return _sum_rows(total, "priceWithVat")
+        return sum_rows(total, "priceWithVat")
     return float(value)
 
 

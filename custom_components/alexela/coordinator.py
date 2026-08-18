@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -11,53 +10,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import aiohttp_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.util import dt as dt_util
 
 from .api import AlexelaApi, AlexelaAuthError, AlexelaConnectionError
-from .const import CONF_CRM_ID, CONF_TOKEN, DATA_LAG, DOMAIN, UPDATE_INTERVAL
+from .const import CONF_CRM_ID, CONF_TOKEN, DOMAIN, UPDATE_INTERVAL
+from .parsing import has_consumption_data, reference_datetime, unwrap_payload
+from .statistics import AlexelaStatisticsImporter
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def reference_datetime() -> datetime:
-    """Return the most recent local time Alexela is expected to have data for.
-
-    The portal publishes consumption with about a day of delay, so anchoring on
-    today would ask for a period that does not exist yet on the first day of a
-    month or year.
-    """
-    return dt_util.now() - DATA_LAG
-
-
-def unwrap_payload(payload: Any) -> dict[str, Any]:
-    """Return the object that carries the consumption blocks.
-
-    Some Alexela endpoints answer with an envelope such as
-    {"result": {...}, "value": null}, so the consumption blocks are not always
-    at the top level of the response.
-    """
-    if not isinstance(payload, dict):
-        return {}
-    if "electricityConsumption" in payload:
-        return payload
-    for key in ("result", "value", "data"):
-        inner = payload.get(key)
-        if isinstance(inner, dict) and "electricityConsumption" in inner:
-            return inner
-    return payload
-
-
-def has_consumption_data(data: dict[str, Any] | None) -> bool:
-    """Return True when the payload carries at least one usable period."""
-    if not data:
-        return False
-    return any(
-        row.get("amount") is not None
-        for block in data.get("electricityConsumption", [])
-        if isinstance(block, dict)
-        for row in block.get("data", [])
-        if isinstance(row, dict)
-    )
 
 
 class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -71,6 +30,9 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             entry.data[CONF_TOKEN],
         )
         self._last_valid: dict[str, Any] | None = None
+        self.statistics = AlexelaStatisticsImporter(
+            hass, self.api, entry.data[CONF_CRM_ID]
+        )
         super().__init__(
             hass,
             _LOGGER,
@@ -117,6 +79,15 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
                 return self._last_valid
 
+        else:
+            # Statistics carry the history and the Energy Dashboard data; the
+            # sensors are only the live summary, so a failure here must not
+            # take them down with it.
+            try:
+                await self.statistics.async_update(data)
+            except Exception:  # noqa: BLE001 - statistics must not break polling
+                _LOGGER.exception("Could not import Alexela statistics")
+
         self._last_valid = data
         return data
 
@@ -134,7 +105,9 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_get_year(self, year: int) -> dict[str, Any]:
         """Fetch and unwrap one year, logging what Alexela actually returned."""
-        payload = unwrap_payload(await self.api.async_get_consumption(year))
+        payload = unwrap_payload(
+            await self.api.async_get_consumption(f"{year}-01-01 00:00:00", "year")
+        )
         _LOGGER.debug("Alexela consumption response for %s: %s", year, payload)
         if not has_consumption_data(payload):
             _LOGGER.warning(
