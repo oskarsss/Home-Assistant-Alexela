@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+from urllib.parse import quote, urlencode
 
 from aiohttp import ClientError, ClientResponse, ClientSession
+from yarl import URL
 
 from .const import API_HOST, PORTAL_ORIGIN, REQUEST_TIMEOUT
 
@@ -45,10 +47,29 @@ class AlexelaApi:
 
     @property
     def _auth_headers(self) -> dict[str, str]:
+        # The portal headers are sent on every call. This API serves both the
+        # Estonian and the Latvian market, and requests that do not look like
+        # they come from my.alexela.lv can come back empty.
         return {
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/json, text/plain, */*",
+            "Origin": PORTAL_ORIGIN,
+            "Referer": f"{PORTAL_ORIGIN}/",
+            "Accept-Language": "lv",
         }
+
+    def _url(self, path: str, params: dict[str, str] | None = None) -> URL:
+        """Build a request URL encoded the way the portal encodes it.
+
+        aiohttp turns a space in a query value into "+", which this backend does
+        not read back as a space: /consumption then answers HTTP 200 with empty
+        consumption lists. The portal sends "%20" and leaves colons literal, so
+        pre-encode the query and hand aiohttp a URL it will not touch.
+        """
+        url = f"{self._base_url}{path}"
+        if params:
+            url = f"{url}?{urlencode(params, quote_via=quote, safe=':')}"
+        return URL(url, encoded=True)
 
     async def _raise_for_status(self, response: ClientResponse) -> None:
         if response.status in (401, 403):
@@ -73,8 +94,7 @@ class AlexelaApi:
         try:
             async with asyncio.timeout(REQUEST_TIMEOUT):
                 async with self._session.get(
-                    f"{self._base_url}{path}",
-                    params=params,
+                    self._url(path, params),
                     headers=request_headers,
                 ) as response:
                     await self._raise_for_status(response)
@@ -103,17 +123,11 @@ class AlexelaApi:
         Alexela returns HTTP 200 even when no rotation is needed. When a new
         JWT is issued it is returned in the response header named 'Bearer'.
         """
-        headers = {
-            "Origin": PORTAL_ORIGIN,
-            "Referer": f"{PORTAL_ORIGIN}/",
-            "Accept-Language": "lv",
-        }
-
         try:
             async with asyncio.timeout(REQUEST_TIMEOUT):
                 async with self._session.get(
-                    f"{self._base_url}/login/refreshJwt",
-                    headers={**self._auth_headers, **headers},
+                    self._url("/login/refreshJwt"),
+                    headers=self._auth_headers,
                 ) as response:
                     await self._raise_for_status(response)
 
