@@ -29,15 +29,35 @@ def reference_datetime() -> datetime:
     return dt_util.now() - DATA_LAG
 
 
+def unwrap_payload(payload: Any) -> dict[str, Any]:
+    """Return the object that carries the consumption blocks.
+
+    Some Alexela endpoints answer with an envelope such as
+    {"result": {...}, "value": null}, so the consumption blocks are not always
+    at the top level of the response.
+    """
+    if not isinstance(payload, dict):
+        return {}
+    if "electricityConsumption" in payload:
+        return payload
+    for key in ("result", "value", "data"):
+        inner = payload.get(key)
+        if isinstance(inner, dict) and "electricityConsumption" in inner:
+            return inner
+    return payload
+
+
 def has_consumption_data(data: dict[str, Any] | None) -> bool:
     """Return True when the payload carries at least one usable period."""
     if not data:
         return False
-    for item in data.get("electricityConsumption", []):
-        if item.get("isTotal") is not True:
-            continue
-        return any(row.get("amount") is not None for row in item.get("data", []))
-    return False
+    return any(
+        row.get("amount") is not None
+        for block in data.get("electricityConsumption", [])
+        if isinstance(block, dict)
+        for row in block.get("data", [])
+        if isinstance(row, dict)
+    )
 
 
 class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -96,7 +116,6 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "previously received consumption data"
                 )
                 return self._last_valid
-            _LOGGER.warning("Alexela returned no consumption data yet")
 
         self._last_valid = data
         return data
@@ -104,11 +123,30 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_fetch_consumption(self) -> dict[str, Any]:
         """Fetch the year that holds Alexela's most recent published data."""
         reference = reference_datetime()
-        data = await self.api.async_get_consumption(reference.year)
+        data = await self._async_get_year(reference.year)
         if has_consumption_data(data):
             return data
 
         # Around New Year the new year is still empty, so the latest published
         # data belongs to the previous year.
-        previous = await self.api.async_get_consumption(reference.year - 1)
+        previous = await self._async_get_year(reference.year - 1)
         return previous if has_consumption_data(previous) else data
+
+    async def _async_get_year(self, year: int) -> dict[str, Any]:
+        """Fetch and unwrap one year, logging what Alexela actually returned."""
+        payload = unwrap_payload(await self.api.async_get_consumption(year))
+        _LOGGER.debug("Alexela consumption response for %s: %s", year, payload)
+        if not has_consumption_data(payload):
+            _LOGGER.warning(
+                "Alexela returned no usable consumption data for %s. Top-level "
+                "keys: %s. Electricity blocks: %s. Enable debug logging for "
+                "custom_components.alexela to see the full response",
+                year,
+                ", ".join(sorted(payload)) or "none",
+                [
+                    {k: v for k, v in block.items() if k != "data"}
+                    for block in payload.get("electricityConsumption", [])
+                    if isinstance(block, dict)
+                ],
+            )
+        return payload

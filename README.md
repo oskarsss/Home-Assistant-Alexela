@@ -91,6 +91,15 @@ Alexela publishes consumption with about a day of delay, and the portal is not a
 - If Alexela is unreachable or returns an empty response, the last successfully received values are kept instead of the sensors going unavailable. The reason is logged as a warning.
 - If the current year is still empty (early January), the previous year is fetched instead.
 
+If every sensor shows **Unknown** (as opposed to *Unavailable*), the poll succeeded but the response could not be parsed. Enable debug logging to see the raw payload:
+
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.alexela: debug
+```
+
 ## Energy Dashboard
 
 For **Grid consumption**, select:
