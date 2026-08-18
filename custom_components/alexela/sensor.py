@@ -22,7 +22,7 @@ from homeassistant.util import dt as dt_util
 
 from . import AlexelaConfigEntry
 from .const import CONF_CRM_ID, DOMAIN
-from .coordinator import AlexelaCoordinator
+from .coordinator import AlexelaCoordinator, reference_datetime
 
 ValueFn = Callable[[dict[str, Any]], float | Decimal | None]
 
@@ -35,17 +35,41 @@ def _total_block(data: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def _current_month_block(data: dict[str, Any]) -> dict[str, Any] | None:
-    """Return the aggregate row for the current month."""
+def _period_block(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the aggregate row for the latest month Alexela has data for.
+
+    Alexela is roughly a day behind and occasionally skips a period, so the row
+    for the current month can be missing entirely. Take the newest row that is
+    not in the future instead of insisting on an exact match for today.
+    """
     total = _total_block(data)
     if not total:
         return None
 
-    target = dt_util.now().strftime("%Y-%m-01T00:00:00")
-    for item in total.get("data", []):
-        if item.get("timestamp") == target:
-            return item
-    return None
+    # Timestamps look like "2026-08-01T00:00:00", so they sort lexicographically.
+    reference = reference_datetime().strftime("%Y-%m-01T00:00:00")
+    candidates = [
+        item
+        for item in total.get("data", [])
+        if isinstance(item.get("timestamp"), str)
+        and item["timestamp"] <= reference
+        and item.get("amount") is not None
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: item["timestamp"])
+
+
+def _period_start(data: dict[str, Any]) -> datetime | None:
+    """Return the local start of the period the month sensors report."""
+    block = _period_block(data)
+    timestamp = block.get("timestamp") if block else None
+    parsed = dt_util.parse_datetime(timestamp) if timestamp else None
+    if parsed is None:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt_util.now().tzinfo)
+    return parsed
 
 
 def _ytd_energy(data: dict[str, Any]) -> float | None:
@@ -55,7 +79,7 @@ def _ytd_energy(data: dict[str, Any]) -> float | None:
 
 
 def _month_energy(data: dict[str, Any]) -> float | None:
-    month = _current_month_block(data)
+    month = _period_block(data)
     value = month.get("amount") if month else None
     return float(value) if value is not None else None
 
@@ -67,7 +91,7 @@ def _ytd_cost(data: dict[str, Any]) -> float | None:
 
 
 def _month_cost(data: dict[str, Any]) -> float | None:
-    month = _current_month_block(data)
+    month = _period_block(data)
     value = month.get("priceWithVat") if month else None
     return float(value) if value is not None else None
 
@@ -80,7 +104,7 @@ def _month_effective_price(data: dict[str, Any]) -> float | None:
     Energy Dashboard's "current price" mode. This is an effective monthly
     average, not necessarily an instantaneous Nord Pool price.
     """
-    month = _current_month_block(data)
+    month = _period_block(data)
     if not month:
         return None
 
@@ -184,7 +208,23 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
     @property
     def native_value(self) -> float | Decimal | None:
         """Return the current sensor value."""
-        return self.entity_description.value_fn(self.coordinator.data)
+        data = self.coordinator.data
+        if not data:
+            return None
+        return self.entity_description.value_fn(data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Expose the period the value actually covers.
+
+        Alexela lags about a day behind, so the reported month is not always the
+        current calendar month. Publishing the period start makes it obvious
+        which data Home Assistant is showing.
+        """
+        period = _period_start(self.coordinator.data or {})
+        if period is None:
+            return None
+        return {"data_period_start": period.isoformat()}
 
     @property
     def last_reset(self) -> datetime | None:
@@ -192,24 +232,17 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
 
         Home Assistant's monetary device class supports the TOTAL state class,
         not TOTAL_INCREASING. Supplying the period reset makes monthly/yearly
-        cost statistics reset cleanly when Alexela starts a new period.
+        cost statistics reset cleanly when Alexela starts a new period. The
+        boundary follows the period Alexela actually returned, not today, so a
+        value that still covers the previous month or year is not attributed to
+        the current one.
         """
-        now = dt_util.now()
-        if self.entity_description.key == "electricity_cost_ytd":
-            return now.replace(
-                month=1,
-                day=1,
-                hour=0,
-                minute=0,
-                second=0,
-                microsecond=0,
-            )
-        if self.entity_description.key == "electricity_cost_month":
-            return now.replace(
-                day=1,
-                hour=0,
-                minute=0,
-                second=0,
-                microsecond=0,
-            )
-        return None
+        key = self.entity_description.key
+        if key not in ("electricity_cost_ytd", "electricity_cost_month"):
+            return None
+
+        period = _period_start(self.coordinator.data or {}) or reference_datetime()
+        period = period.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if key == "electricity_cost_ytd":
+            return period.replace(month=1)
+        return period

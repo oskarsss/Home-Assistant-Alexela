@@ -14,3 +14,8 @@ PORTAL_ORIGIN = "https://my.alexela.lv"
 # /login/refreshJwt. Poll often enough to refresh well before token expiry.
 UPDATE_INTERVAL = timedelta(minutes=15)
 REQUEST_TIMEOUT = 30
+
+# Alexela publishes consumption only up to the previous day, so every period
+# lookup is anchored on yesterday instead of today. Without this the first day
+# of a month (and of a year) would ask for a period Alexela has no data for.
+DATA_LAG = timedelta(days=1)
