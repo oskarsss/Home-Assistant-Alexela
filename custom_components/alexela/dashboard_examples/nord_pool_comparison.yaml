@@ -18,13 +18,13 @@
           period: energy_date_selection
           stat_type: change
         - type: statistic
-          entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_reference_cost
-          name: Nord Pool reference
+          entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
+          name: Nord Pool + provider markup
           icon: mdi:chart-line
           period: energy_date_selection
           stat_type: change
         - type: statistic
-          entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool
+          entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool_provider
           name: Lost (+) / saved (-)
           icon: mdi:scale-balance
           period: energy_date_selection
@@ -38,8 +38,8 @@
         - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
           name: Alexela
           color: "#ef5350"
-        - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_reference_cost
-          name: Nord Pool incl VAT
+        - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
+          name: Nord Pool incl VAT + provider markup
           color: "#42a5f5"
       stat_types:
         - change
@@ -49,7 +49,7 @@
       chart_type: bar
       energy_date_selection: true
       entities:
-        - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool
+        - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool_provider
           name: Positive = paid more; negative = saved
           color: "#ab47bc"
       stat_types:

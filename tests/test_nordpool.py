@@ -39,6 +39,8 @@ def _load_nordpool_module():
     constants = ModuleType("custom_components.alexela.const")
     constants.NORD_POOL_API_HOST = "https://example.test"
     constants.NORD_POOL_DELIVERY_AREA = "LV"
+    constants.LATVIA_VAT_MULTIPLIER = 1.21
+    constants.PROVIDER_MARKUP_EUR_PER_KWH = 0.0087
     constants.REQUEST_TIMEOUT = 30
     sys.modules["custom_components.alexela.const"] = constants
 
@@ -133,6 +135,20 @@ class NordPoolApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             session.requested_dates,
             [date(2026, 8, 9), date(2026, 8, 10), date(2026, 8, 11)],
+        )
+
+
+class ReferencePriceTest(unittest.TestCase):
+    def test_converts_spot_price_with_vat(self):
+        self.assertAlmostEqual(
+            NORDPOOL.spot_price_eur_per_kwh(100.0),
+            0.121,
+        )
+
+    def test_adds_vat_and_vat_inclusive_provider_markup(self):
+        self.assertAlmostEqual(
+            NORDPOOL.reference_price_eur_per_kwh(100.0),
+            0.1297,
         )
 
 

@@ -12,8 +12,10 @@ from aiohttp import ClientError, ClientSession
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    LATVIA_VAT_MULTIPLIER,
     NORD_POOL_API_HOST,
     NORD_POOL_DELIVERY_AREA,
+    PROVIDER_MARKUP_EUR_PER_KWH,
     REQUEST_TIMEOUT,
 )
 
@@ -100,6 +102,16 @@ class NordPoolApi:
         if len(self._payload_cache) > 2:
             del self._payload_cache[min(self._payload_cache)]
         return payload
+
+
+def spot_price_eur_per_kwh(eur_per_mwh: float) -> float:
+    """Convert a Nord Pool price to VAT-inclusive EUR/kWh."""
+    return eur_per_mwh / 1000 * LATVIA_VAT_MULTIPLIER
+
+
+def reference_price_eur_per_kwh(eur_per_mwh: float) -> float:
+    """Convert a Nord Pool price to the provider-inclusive reference price."""
+    return spot_price_eur_per_kwh(eur_per_mwh) + PROVIDER_MARKUP_EUR_PER_KWH
 
 
 def price_intervals(payload: dict[str, Any]) -> list[NordPoolPriceInterval]:

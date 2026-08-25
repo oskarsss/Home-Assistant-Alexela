@@ -26,12 +26,17 @@ from homeassistant.util import dt as dt_util
 from .api import AlexelaApi
 from .const import (
     DOMAIN,
-    LATVIA_VAT_MULTIPLIER,
     MAX_BACKFILL_DAYS,
     NORD_POOL_INITIAL_BACKFILL_DAYS,
     PORTAL_TIME_ZONE,
 )
-from .nordpool import NordPoolApi, NordPoolError, price_intervals
+from .nordpool import (
+    NordPoolApi,
+    NordPoolError,
+    price_intervals,
+    reference_price_eur_per_kwh,
+    spot_price_eur_per_kwh,
+)
 from .parsing import (
     block_rows,
     cost_scale,
@@ -94,8 +99,9 @@ def nord_pool_hourly_buckets(
 
     Nord Pool changed from hourly to 15-minute day-ahead products, so each
     Alexela reading is matched against an interval range. Prices are converted
-    from EUR/MWh excluding VAT to EUR/kWh including Latvian VAT before costs
-    are compared with Alexela's priceWithVat.
+    from EUR/MWh excluding VAT to EUR/kWh including Latvian VAT, then the
+    VAT-inclusive provider markup is added before costs are compared with
+    Alexela's priceWithVat.
     """
     block = total_block(consumption_payload)
     scale = cost_scale(block)
@@ -124,16 +130,17 @@ def nord_pool_hourly_buckets(
                 f"Nord Pool has no price covering {reading_start.isoformat()}"
             )
 
-        price = interval.eur_per_mwh / 1000 * LATVIA_VAT_MULTIPLIER
+        spot_price = spot_price_eur_per_kwh(interval.eur_per_mwh)
+        reference_price = reference_price_eur_per_kwh(interval.eur_per_mwh)
         energy = float(row["amount"])
-        reference_cost = energy * price
+        reference_cost = energy * reference_price
         actual_cost = float(actual_price) * scale
         hour = timestamp.replace(minute=0, second=0, microsecond=0)
         bucket = buckets.setdefault(
             hour,
             {"prices": [], "reference_cost": 0.0, "difference": 0.0},
         )
-        bucket["prices"].append(price)
+        bucket["prices"].append(spot_price)
         bucket["reference_cost"] += reference_cost
         bucket["difference"] += actual_cost - reference_cost
 
@@ -174,9 +181,14 @@ class AlexelaStatisticsImporter:
         self.energy_id = f"{DOMAIN}:{crm_id}_electricity_energy"
         self.cost_id = f"{DOMAIN}:{crm_id}_electricity_cost"
         self.nord_pool_price_id = f"{DOMAIN}:{crm_id}_nord_pool_price"
-        self.nord_pool_cost_id = f"{DOMAIN}:{crm_id}_nord_pool_reference_cost"
+        # v0.3.2 uses new statistic IDs so existing spot-only v0.3.0/v0.3.1
+        # history is not silently mixed with the provider-inclusive formula.
+        # Home Assistant then backfills these new series from their own cursor.
+        self.nord_pool_cost_id = (
+            f"{DOMAIN}:{crm_id}_nord_pool_provider_reference_cost"
+        )
         self.nord_pool_difference_id = (
-            f"{DOMAIN}:{crm_id}_electricity_cost_difference_vs_nord_pool"
+            f"{DOMAIN}:{crm_id}_electricity_cost_difference_vs_nord_pool_provider"
         )
 
     async def async_update(self, year_payload: dict[str, Any]) -> dict[str, Any]:
@@ -336,7 +348,7 @@ class AlexelaStatisticsImporter:
                 self.hass,
                 self._sum_metadata(
                     self.nord_pool_cost_id,
-                    "Nord Pool reference cost incl VAT",
+                    "Nord Pool plus provider markup reference cost",
                     "EUR",
                 ),
                 nord_pool_cost_stats,
@@ -345,7 +357,7 @@ class AlexelaStatisticsImporter:
                 self.hass,
                 self._sum_metadata(
                     self.nord_pool_difference_id,
-                    "Alexela cost difference vs Nord Pool",
+                    "Alexela cost difference vs Nord Pool plus provider markup",
                     "EUR",
                 ),
                 difference_stats,

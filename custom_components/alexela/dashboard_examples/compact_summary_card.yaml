@@ -9,7 +9,7 @@ entities:
     name: Latest matched spot price
     icon: mdi:lightning-bolt
   - entity: sensor.alexela_nord_pool_reference_cost_incl_vat
-    name: Nord Pool reference cost
+    name: Nord Pool + provider markup
     icon: mdi:chart-line
   - entity: sensor.alexela_electricity_cost_difference_vs_nord_pool
     name: Lost (+) / saved (-)

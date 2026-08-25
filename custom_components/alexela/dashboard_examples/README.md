@@ -9,7 +9,9 @@ Open `nord_pool_comparison.yaml`, replace every `REPLACE_WITH_CRM_ID` with the
 CRM ID configured in Alexela, and copy the view into a dashboard's raw YAML
 configuration. It uses only built-in Home Assistant cards and includes a date
 picker, selected-period totals, cost graphs, the signed difference and the
-historical Nord Pool spot price.
+historical Nord Pool spot price. The comparison cost includes the provider's
+VAT-inclusive `0.0087 EUR/kWh` markup and uses Alexela's delayed published
+consumption rather than live usage.
 
 ## Compact summary
 

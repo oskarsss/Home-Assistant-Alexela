@@ -17,13 +17,13 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   - Electricity cost this month (`EUR`)
   - Electricity price this month (`EUR/kWh`)
   - Latest matched Nord Pool Latvia price incl. VAT (`EUR/kWh`)
-  - Nord Pool reference cost for all imported consumption (`EUR`)
-  - Alexela cost difference vs Nord Pool for all imported consumption (`EUR`)
+  - Nord Pool plus provider-markup reference cost (`EUR`)
+  - Alexela cost difference versus that comparison (`EUR`)
 - Imports Alexela's published 15-minute readings into hourly Home Assistant
   long-term statistics for historical Energy Dashboard data.
 - Matches each consumption interval to the official Nord Pool Latvia day-ahead
-  price and imports hourly spot-price, reference-cost and cost-difference
-  statistics.
+  price, adds the VAT-inclusive `0.0087 EUR/kWh` provider markup, and imports
+  hourly spot-price, reference-cost and cost-difference statistics.
 - Supports Home Assistant reauthentication if the stored JWT becomes invalid.
 
 ## Installation
@@ -134,11 +134,13 @@ creates these external long-term statistics:
 
 - `alexela:<CRM ID>_nord_pool_price` — the hourly average Nord Pool price,
   converted from `EUR/MWh` to `EUR/kWh` and including 21% Latvian VAT.
-- `alexela:<CRM ID>_nord_pool_reference_cost` — what the metered consumption
-  would have cost at that VAT-inclusive spot price.
-- `alexela:<CRM ID>_electricity_cost_difference_vs_nord_pool` — Alexela's
-  reported `priceWithVat` minus the Nord Pool reference cost. A positive total
-  means Alexela cost more; a negative total means it cost less.
+- `alexela:<CRM ID>_nord_pool_provider_reference_cost` — what the metered
+  consumption would have cost at the VAT-inclusive spot price plus the
+  provider's VAT-inclusive `0.0087 EUR/kWh` markup.
+- `alexela:<CRM ID>_electricity_cost_difference_vs_nord_pool_provider` —
+  Alexela's reported `priceWithVat` minus that provider-inclusive reference
+  cost. A positive total means Alexela cost more; a negative total means it
+  cost less.
 
 The three Nord Pool sensors show the latest matched price and running totals
 for all comparison history imported so far. The `data_through` attribute shows
@@ -153,12 +155,19 @@ Nord Pool groups prices by the CET/CEST delivery date. Because Latvia is one
 hour ahead, the integration combines the requested and previous Nord Pool
 delivery dates so the first hour after Latvian midnight is included.
 
-This is a spot-price reference, not a reconstruction of an alternative bill.
-It includes VAT to make the comparison compatible with Alexela's
-`priceWithVat`, but excludes network/distribution charges and any other tariff
-component absent from that Alexela field. Nord Pool changed the official
-day-ahead resolution from hourly to 15 minutes; both forms are matched by their
-actual delivery start and end times.
+This is a spot-price-plus-provider-markup reference, not a reconstruction of a
+complete alternative bill. It includes 21% VAT on the Nord Pool price and adds
+the provider's already VAT-inclusive `0.0087 EUR/kWh` markup to make the
+comparison compatible with Alexela's `priceWithVat`. It excludes
+network/distribution charges and any other tariff component absent from that
+Alexela field. Nord Pool changed the official day-ahead resolution from hourly
+to 15 minutes; both forms are matched by their actual delivery start and end
+times.
+
+Versions before `0.3.2` created spot-only comparison statistic IDs. Version
+`0.3.2` writes the provider-inclusive comparison to new statistic IDs so the
+two formulas are never mixed; the new series backfill automatically from the
+available Nord Pool history.
 
 ### Dashboard examples
 

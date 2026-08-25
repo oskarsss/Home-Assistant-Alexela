@@ -21,7 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from . import AlexelaConfigEntry
-from .const import CONF_CRM_ID, DOMAIN
+from .const import CONF_CRM_ID, DOMAIN, PROVIDER_MARKUP_EUR_PER_KWH
 from .coordinator import AlexelaCoordinator
 from .parsing import reference_datetime, sum_rows, total_block
 from .statistics import NORD_POOL_SUMMARY_KEY
@@ -184,7 +184,7 @@ SENSORS: tuple[AlexelaSensorDescription, ...] = (
     ),
     AlexelaSensorDescription(
         key="nord_pool_reference_cost",
-        name="Nord Pool reference cost incl VAT",
+        name="Nord Pool plus provider markup reference cost",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="EUR",
         suggested_display_precision=3,
@@ -192,7 +192,7 @@ SENSORS: tuple[AlexelaSensorDescription, ...] = (
     ),
     AlexelaSensorDescription(
         key="electricity_cost_difference_vs_nord_pool",
-        name="Electricity cost difference vs Nord Pool",
+        name="Electricity cost difference vs comparison",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="EUR",
         suggested_display_precision=3,
@@ -262,9 +262,19 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
                 return None
             attributes: dict[str, Any] = {
                 "data_through": summary["data_through"],
-                "price_basis": "Nord Pool Latvia day-ahead price incl 21% VAT",
             }
-            if self.entity_description.key != "nord_pool_price_latest":
+            if self.entity_description.key == "nord_pool_price_latest":
+                attributes["price_basis"] = (
+                    "Nord Pool Latvia day-ahead price incl 21% VAT"
+                )
+            else:
+                attributes["price_basis"] = (
+                    "Nord Pool Latvia day-ahead price incl 21% VAT plus "
+                    "provider markup incl VAT"
+                )
+                attributes["provider_markup_eur_per_kwh"] = (
+                    PROVIDER_MARKUP_EUR_PER_KWH
+                )
                 attributes["comparison_scope"] = "all imported consumption"
             if (
                 self.entity_description.key

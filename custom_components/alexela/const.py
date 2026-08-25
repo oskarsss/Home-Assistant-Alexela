@@ -23,8 +23,13 @@ NORD_POOL_INITIAL_BACKFILL_DAYS = 59
 
 # Alexela exposes priceWithVat, while Nord Pool's day-ahead price excludes VAT.
 # Use the Latvian standard VAT rate so the reference costs share the same tax
-# basis. Network charges are not part of the Nord Pool reference cost.
+# basis. Network charges are not part of the comparison reference.
 LATVIA_VAT_MULTIPLIER = 1.21
+
+# Alexela's provider markup is already VAT-inclusive. Add it after applying
+# VAT to the Nord Pool price; multiplying it by VAT again would overstate the
+# comparison reference.
+PROVIDER_MARKUP_EUR_PER_KWH = 0.0087
 
 # Alexela JWTs observed in August 2026 are short-lived and can be rotated by
 # /login/refreshJwt. Poll often enough to refresh well before token expiry.
