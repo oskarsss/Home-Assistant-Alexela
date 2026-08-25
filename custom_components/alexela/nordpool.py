@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from aiohttp import ClientError, ClientSession
@@ -36,9 +36,36 @@ class NordPoolApi:
 
     def __init__(self, session: ClientSession) -> None:
         self._session = session
+        self._payload_cache: dict[date, dict[str, Any]] = {}
 
     async def async_get_day_ahead_prices(self, delivery_date: date) -> dict[str, Any]:
-        """Return Latvia day-ahead prices for one local delivery date."""
+        """Return prices covering one complete Latvian local day.
+
+        Nord Pool groups intervals by the CET/CEST delivery date, while
+        Alexela timestamps use Europe/Riga. Riga is one hour ahead, so the
+        first hour of a Latvian day belongs to Nord Pool's previous delivery
+        date. Merge both payloads so every Alexela interval can be matched.
+        """
+        payloads = [
+            await self._async_get_delivery_date(delivery_date - timedelta(days=1)),
+            await self._async_get_delivery_date(delivery_date),
+        ]
+        payload = dict(payloads[-1])
+        entries: list[dict[str, Any]] = []
+        for source in payloads:
+            source_entries = source.get("multiAreaEntries")
+            if isinstance(source_entries, list):
+                entries.extend(
+                    entry for entry in source_entries if isinstance(entry, dict)
+                )
+        payload["multiAreaEntries"] = entries
+        return payload
+
+    async def _async_get_delivery_date(self, delivery_date: date) -> dict[str, Any]:
+        """Fetch one Nord Pool CET/CEST delivery-date payload."""
+        if (cached := self._payload_cache.get(delivery_date)) is not None:
+            return cached
+
         try:
             async with asyncio.timeout(REQUEST_TIMEOUT):
                 async with self._session.get(
@@ -68,6 +95,10 @@ class NordPoolApi:
 
         if not isinstance(payload, dict):
             raise NordPoolError("Unexpected Nord Pool response")
+
+        self._payload_cache[delivery_date] = payload
+        if len(self._payload_cache) > 2:
+            del self._payload_cache[min(self._payload_cache)]
         return payload
 
 

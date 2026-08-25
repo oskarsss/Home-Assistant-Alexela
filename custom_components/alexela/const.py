@@ -16,9 +16,10 @@ NORD_POOL_API_HOST = "https://dataportal-api.nordpoolgroup.com"
 NORD_POOL_DELIVERY_AREA = "LV"
 
 # The unauthenticated Data Portal endpoint exposes only about two months of
-# interval history. Stay just inside that window on first import; after that,
-# Home Assistant keeps every imported hour indefinitely.
-NORD_POOL_INITIAL_BACKFILL_DAYS = 60
+# interval history. A Latvian local day also needs the previous CET/CEST
+# delivery date for its first hour, so leave that extra day inside the window.
+# Home Assistant keeps every imported hour indefinitely after the first import.
+NORD_POOL_INITIAL_BACKFILL_DAYS = 59
 
 # Alexela exposes priceWithVat, while Nord Pool's day-ahead price excludes VAT.
 # Use the Latvian standard VAT rate so the reference costs share the same tax

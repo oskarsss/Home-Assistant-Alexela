@@ -149,6 +149,10 @@ those statistics indefinitely and the comparison history grows from then on.
 Use the external statistics in a Statistics Graph card to view and total a
 specific day, month or year covered by the imported history.
 
+Nord Pool groups prices by the CET/CEST delivery date. Because Latvia is one
+hour ahead, the integration combines the requested and previous Nord Pool
+delivery dates so the first hour after Latvian midnight is included.
+
 This is a spot-price reference, not a reconstruction of an alternative bill.
 It includes VAT to make the comparison compatible with Alexela's
 `priceWithVat`, but excludes network/distribution charges and any other tariff
