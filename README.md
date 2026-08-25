@@ -16,8 +16,14 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   - Electricity cost YTD (`EUR`)
   - Electricity cost this month (`EUR`)
   - Electricity price this month (`EUR/kWh`)
+  - Latest matched Nord Pool Latvia price incl. VAT (`EUR/kWh`)
+  - Nord Pool reference cost for all imported consumption (`EUR`)
+  - Alexela cost difference vs Nord Pool for all imported consumption (`EUR`)
 - Imports Alexela's published 15-minute readings into hourly Home Assistant
   long-term statistics for historical Energy Dashboard data.
+- Matches each consumption interval to the official Nord Pool Latvia day-ahead
+  price and imports hourly spot-price, reference-cost and cost-difference
+  statistics.
 - Supports Home Assistant reauthentication if the stored JWT becomes invalid.
 
 ## Installation
@@ -120,6 +126,55 @@ Do not select an `EUR` total-cost sensor in the **current price** field. Home As
 
 The monthly price sensor is calculated as Alexela's reported month energy cost divided by that month's kWh. It is an effective monthly average, not necessarily an instantaneous spot-market price.
 
+## Nord Pool comparison
+
+For every published Alexela consumption interval, the integration looks up the
+Nord Pool Latvia (`LV`) day-ahead interval that covered the same moment. It
+creates these external long-term statistics:
+
+- `alexela:<CRM ID>_nord_pool_price` — the hourly average Nord Pool price,
+  converted from `EUR/MWh` to `EUR/kWh` and including 21% Latvian VAT.
+- `alexela:<CRM ID>_nord_pool_reference_cost` — what the metered consumption
+  would have cost at that VAT-inclusive spot price.
+- `alexela:<CRM ID>_electricity_cost_difference_vs_nord_pool` — Alexela's
+  reported `priceWithVat` minus the Nord Pool reference cost. A positive total
+  means Alexela cost more; a negative total means it cost less.
+
+The three Nord Pool sensors show the latest matched price and running totals
+for all comparison history imported so far. The `data_through` attribute shows
+the newest completed hour. During initial backfill those totals grow as older
+days are imported. The public Nord Pool Data Portal exposes only about 60 days
+of interval history, so a new installation starts there; Home Assistant keeps
+those statistics indefinitely and the comparison history grows from then on.
+Use the external statistics in a Statistics Graph card to view and total a
+specific day, month or year covered by the imported history.
+
+This is a spot-price reference, not a reconstruction of an alternative bill.
+It includes VAT to make the comparison compatible with Alexela's
+`priceWithVat`, but excludes network/distribution charges and any other tariff
+component absent from that Alexela field. Nord Pool changed the official
+day-ahead resolution from hourly to 15 minutes; both forms are matched by their
+actual delivery start and end times.
+
+### Dashboard examples
+
+HACS installs two ready-to-copy examples inside
+`custom_components/alexela/dashboard_examples/`:
+
+- [`nord_pool_comparison.yaml`](custom_components/alexela/dashboard_examples/nord_pool_comparison.yaml)
+  is a complete native Home Assistant view with a date picker, selected-period
+  totals, comparison bars and a spot-price graph. Replace
+  `REPLACE_WITH_CRM_ID` with the CRM ID used by this integration before pasting
+  it under `views:` in a dashboard's raw configuration.
+- [`compact_summary_card.yaml`](custom_components/alexela/dashboard_examples/compact_summary_card.yaml)
+  is a small entities card for the three live summary sensors. Check the
+  generated entity IDs under **Settings -> Devices & services -> Alexela** if
+  Home Assistant renamed or suffixed them.
+
+HACS custom integrations are installed under `custom_components/`; they do not
+automatically edit a user's dashboard. The examples use only built-in Home
+Assistant cards, so no separate dashboard-card dependency is required.
+
 ## Authentication and token rotation
 
 The integration owns the JWT rotation chain supplied during setup.
@@ -151,6 +206,9 @@ The integration cannot create a new Alexela login session from username/password
 ## Known limitations
 
 - Uses an undocumented private Alexela API.
+- Uses the public JSON endpoint behind Nord Pool's Data Portal; Nord Pool may
+  change it without notice. A Nord Pool failure does not stop Alexela data from
+  updating and is retried later.
 - Targets the Latvia Alexela portal/API behavior tested for this integration.
 - Consumption data is a day or more behind. Summary sensors are monthly; the
   imported long-term statistics are hourly totals built from 15-minute data.

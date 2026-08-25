@@ -13,8 +13,9 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import AlexelaApi, AlexelaAuthError, AlexelaConnectionError
 from .const import CONF_CRM_ID, CONF_TOKEN, DOMAIN, UPDATE_INTERVAL
+from .nordpool import NordPoolApi
 from .parsing import has_consumption_data, reference_datetime, unwrap_payload
-from .statistics import AlexelaStatisticsImporter
+from .statistics import AlexelaStatisticsImporter, NORD_POOL_SUMMARY_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +32,10 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self._last_valid: dict[str, Any] | None = None
         self.statistics = AlexelaStatisticsImporter(
-            hass, self.api, entry.data[CONF_CRM_ID]
+            hass,
+            self.api,
+            NordPoolApi(aiohttp_client.async_get_clientsession(hass)),
+            entry.data[CONF_CRM_ID],
         )
         super().__init__(
             hass,
@@ -84,7 +88,8 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # sensors are only the live summary, so a failure here must not
             # take them down with it.
             try:
-                await self.statistics.async_update(data)
+                summary = await self.statistics.async_update(data)
+                data[NORD_POOL_SUMMARY_KEY] = summary
             except Exception:  # noqa: BLE001 - statistics must not break polling
                 _LOGGER.exception("Could not import Alexela statistics")
 

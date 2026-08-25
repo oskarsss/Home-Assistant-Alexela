@@ -24,6 +24,7 @@ from . import AlexelaConfigEntry
 from .const import CONF_CRM_ID, DOMAIN
 from .coordinator import AlexelaCoordinator
 from .parsing import reference_datetime, sum_rows, total_block
+from .statistics import NORD_POOL_SUMMARY_KEY
 
 ValueFn = Callable[[dict[str, Any]], float | Decimal | None]
 
@@ -114,6 +115,13 @@ def _month_effective_price(data: dict[str, Any]) -> float | None:
     return float(price) / float(amount)
 
 
+def _nord_pool_summary_value(data: dict[str, Any], key: str) -> float | None:
+    """Return one value calculated while importing Nord Pool statistics."""
+    summary = data.get(NORD_POOL_SUMMARY_KEY)
+    value = summary.get(key) if isinstance(summary, dict) else None
+    return float(value) if value is not None else None
+
+
 @dataclass(frozen=True, kw_only=True)
 class AlexelaSensorDescription(SensorEntityDescription):
     """Describe an Alexela sensor."""
@@ -165,6 +173,30 @@ SENSORS: tuple[AlexelaSensorDescription, ...] = (
         native_unit_of_measurement="EUR/kWh",
         suggested_display_precision=5,
         value_fn=_month_effective_price,
+    ),
+    AlexelaSensorDescription(
+        key="nord_pool_price_latest",
+        name="Latest Nord Pool price incl VAT",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="EUR/kWh",
+        suggested_display_precision=5,
+        value_fn=lambda data: _nord_pool_summary_value(data, "latest_price"),
+    ),
+    AlexelaSensorDescription(
+        key="nord_pool_reference_cost",
+        name="Nord Pool reference cost incl VAT",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="EUR",
+        suggested_display_precision=3,
+        value_fn=lambda data: _nord_pool_summary_value(data, "reference_cost"),
+    ),
+    AlexelaSensorDescription(
+        key="electricity_cost_difference_vs_nord_pool",
+        name="Electricity cost difference vs Nord Pool",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="EUR",
+        suggested_display_precision=3,
+        value_fn=lambda data: _nord_pool_summary_value(data, "difference"),
     ),
 )
 
@@ -219,7 +251,31 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
         current calendar month. Publishing the period start makes it obvious
         which data Home Assistant is showing.
         """
-        period = _period_start(self.coordinator.data or {})
+        data = self.coordinator.data or {}
+        if self.entity_description.key in (
+            "nord_pool_price_latest",
+            "nord_pool_reference_cost",
+            "electricity_cost_difference_vs_nord_pool",
+        ):
+            summary = data.get(NORD_POOL_SUMMARY_KEY)
+            if not isinstance(summary, dict) or not summary.get("data_through"):
+                return None
+            attributes: dict[str, Any] = {
+                "data_through": summary["data_through"],
+                "price_basis": "Nord Pool Latvia day-ahead price incl 21% VAT",
+            }
+            if self.entity_description.key != "nord_pool_price_latest":
+                attributes["comparison_scope"] = "all imported consumption"
+            if (
+                self.entity_description.key
+                == "electricity_cost_difference_vs_nord_pool"
+            ):
+                attributes["interpretation"] = (
+                    "positive means Alexela cost was higher; negative means savings"
+                )
+            return attributes
+
+        period = _period_start(data)
         if period is None:
             return None
         return {"data_period_start": period.isoformat()}

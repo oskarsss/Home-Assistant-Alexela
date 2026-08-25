@@ -1,0 +1,67 @@
+# Full native Home Assistant view. Replace every REPLACE_WITH_CRM_ID with the
+# CRM ID configured in the Alexela integration, then paste this under `views:`
+# in a raw dashboard configuration (or use the cards individually).
+- title: Alexela vs Nord Pool
+  path: alexela-nord-pool
+  icon: mdi:transmission-tower
+  cards:
+    - type: energy-date-selection
+
+    - type: grid
+      columns: 3
+      square: false
+      cards:
+        - type: statistic
+          entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+          name: Alexela cost
+          icon: mdi:cash
+          period: energy_date_selection
+          stat_type: change
+        - type: statistic
+          entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_reference_cost
+          name: Nord Pool reference
+          icon: mdi:chart-line
+          period: energy_date_selection
+          stat_type: change
+        - type: statistic
+          entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool
+          name: Lost (+) / saved (-)
+          icon: mdi:scale-balance
+          period: energy_date_selection
+          stat_type: change
+
+    - type: statistics-graph
+      title: Cost by selected period
+      chart_type: bar
+      energy_date_selection: true
+      entities:
+        - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+          name: Alexela
+          color: "#ef5350"
+        - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_reference_cost
+          name: Nord Pool incl VAT
+          color: "#42a5f5"
+      stat_types:
+        - change
+
+    - type: statistics-graph
+      title: Difference vs Nord Pool
+      chart_type: bar
+      energy_date_selection: true
+      entities:
+        - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool
+          name: Positive = paid more; negative = saved
+          color: "#ab47bc"
+      stat_types:
+        - change
+
+    - type: statistics-graph
+      title: Nord Pool Latvia spot price incl VAT
+      chart_type: line
+      energy_date_selection: true
+      entities:
+        - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_price
+          name: EUR/kWh
+          color: "#26a69a"
+      stat_types:
+        - mean

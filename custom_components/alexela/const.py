@@ -10,6 +10,21 @@ CONF_TOKEN = "token"
 API_HOST = "https://itk-api.alexela.ee"
 PORTAL_ORIGIN = "https://my.alexela.lv"
 
+# Public endpoint used by Nord Pool's own Data Portal. Prices are returned in
+# EUR/MWh for the Latvian bidding area.
+NORD_POOL_API_HOST = "https://dataportal-api.nordpoolgroup.com"
+NORD_POOL_DELIVERY_AREA = "LV"
+
+# The unauthenticated Data Portal endpoint exposes only about two months of
+# interval history. Stay just inside that window on first import; after that,
+# Home Assistant keeps every imported hour indefinitely.
+NORD_POOL_INITIAL_BACKFILL_DAYS = 60
+
+# Alexela exposes priceWithVat, while Nord Pool's day-ahead price excludes VAT.
+# Use the Latvian standard VAT rate so the reference costs share the same tax
+# basis. Network charges are not part of the Nord Pool reference cost.
+LATVIA_VAT_MULTIPLIER = 1.21
+
 # Alexela JWTs observed in August 2026 are short-lived and can be rotated by
 # /login/refreshJwt. Poll often enough to refresh well before token expiry.
 UPDATE_INTERVAL = timedelta(minutes=15)
