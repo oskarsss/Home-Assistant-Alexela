@@ -21,6 +21,8 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   - Alexela cost difference versus that comparison (`EUR`)
 - Imports Alexela's published 15-minute readings into hourly Home Assistant
   long-term statistics for historical Energy Dashboard data.
+- Publishes a horizontal all-history average of complete daily electricity
+  usage for daily-consumption charts.
 - Matches each consumption interval to the official Nord Pool Latvia day-ahead
   price, adds the VAT-inclusive `0.0087 EUR/kWh` provider markup, and imports
   hourly spot-price, reference-cost and cost-difference statistics.
@@ -125,6 +127,13 @@ For cost configuration, use one of the following approaches:
 Do not select an `EUR` total-cost sensor in the **current price** field. Home Assistant expects a price-per-energy unit such as `EUR/kWh` there.
 
 The monthly price sensor is calculated as Alexela's reported month energy cost divided by that month's kWh. It is an effective monthly average, not necessarily an instantaneous spot-market price.
+
+For daily usage charts, the integration also publishes
+`alexela:<CRM ID>_electricity_daily_average_all_history`. Its value is the
+average kWh across every complete day currently collected in Home Assistant.
+The same value is written for every collected day so it renders as a horizontal
+reference line beside daily `change` bars. It updates whenever a new day is
+imported; Alexela's usual one-day publication delay still applies.
 
 ## Nord Pool comparison
 

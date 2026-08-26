@@ -18,12 +18,14 @@ from homeassistant.components.recorder.models import StatisticData, StatisticMet
 from homeassistant.components.recorder.statistics import (
     async_add_external_statistics,
     get_last_statistics,
+    statistics_during_period,
 )
 from homeassistant.const import UnitOfEnergy
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from .api import AlexelaApi
+from .analytics import constant_daily_average
 from .const import (
     DOMAIN,
     MAX_BACKFILL_DAYS,
@@ -180,6 +182,9 @@ class AlexelaStatisticsImporter:
         self.nord_pool_api = nord_pool_api
         self.energy_id = f"{DOMAIN}:{crm_id}_electricity_energy"
         self.cost_id = f"{DOMAIN}:{crm_id}_electricity_cost"
+        self.daily_average_id = (
+            f"{DOMAIN}:{crm_id}_electricity_daily_average_all_history"
+        )
         self.nord_pool_price_id = f"{DOMAIN}:{crm_id}_nord_pool_price"
         # v0.3.2 uses new statistic IDs so existing spot-only v0.3.0/v0.3.1
         # history is not silently mixed with the provider-inclusive formula.
@@ -202,6 +207,9 @@ class AlexelaStatisticsImporter:
         )
         last_nord_pool_price = await self._async_last_statistic(
             self.nord_pool_price_id, "mean"
+        )
+        last_daily_average = await self._async_last_statistic(
+            self.daily_average_id, "mean"
         )
 
         imported_through = (
@@ -226,11 +234,14 @@ class AlexelaStatisticsImporter:
         )
         days = await self._async_pending_days(year_payload, zone, oldest_through)
         if not days:
+            if last_daily_average is None:
+                self._async_write_daily_average(await self._async_daily_energy())
             return self._comparison_summary(
                 last_nord_pool_cost, last_difference, last_nord_pool_price
             )
 
         _LOGGER.debug("Alexela statistics: %s day(s) to import", len(days))
+        daily_energy = await self._async_daily_energy()
         energy_sum = last_energy[1] if last_energy else 0.0
         cost_sum = last_cost[1] if last_cost else 0.0
         nord_pool_cost_sum = last_nord_pool_cost[1] if last_nord_pool_cost else 0.0
@@ -264,6 +275,9 @@ class AlexelaStatisticsImporter:
                 break
 
             if imported_through is None or day > imported_through:
+                daily_energy.append(
+                    (buckets[0][0], sum(energy for _, energy, _ in buckets))
+                )
                 for hour, energy, cost in buckets:
                     energy_sum += energy
                     cost_sum += cost
@@ -333,6 +347,9 @@ class AlexelaStatisticsImporter:
                 len(energy_stats),
                 energy_stats[-1]["start"],
             )
+            self._async_write_daily_average(daily_energy)
+        elif last_daily_average is None:
+            self._async_write_daily_average(daily_energy)
 
         if nord_pool_cost_stats:
             async_add_external_statistics(
@@ -403,14 +420,18 @@ class AlexelaStatisticsImporter:
         return metadata
 
     def _mean_metadata(
-        self, statistic_id: str, name: str, unit: str
+        self,
+        statistic_id: str,
+        name: str,
+        unit: str,
+        unit_class: str | None = None,
     ) -> StatisticMetaData:
         metadata: Any = {
             "has_sum": False,
             "name": name,
             "source": DOMAIN,
             "statistic_id": statistic_id,
-            "unit_class": None,
+            "unit_class": unit_class,
             "unit_of_measurement": unit,
         }
         if StatisticMeanType is not None:
@@ -435,6 +456,57 @@ class AlexelaStatisticsImporter:
             start = dt_util.utc_from_timestamp(start)
         value = entries[0].get(value_field)
         return (start, float(value)) if value is not None else None
+
+    async def _async_daily_energy(self) -> list[tuple[datetime, float]]:
+        """Return every complete daily energy change already in the recorder."""
+        rows = await get_instance(self.hass).async_add_executor_job(
+            statistics_during_period,
+            self.hass,
+            datetime(1970, 1, 1, tzinfo=dt_util.UTC),
+            None,
+            {self.energy_id},
+            "day",
+            None,
+            {"change"},
+        )
+
+        daily: list[tuple[datetime, float]] = []
+        for row in rows.get(self.energy_id, []):
+            value = row.get("change")
+            if value is None:
+                continue
+            timestamp = row["start"]
+            if isinstance(timestamp, (int, float)):
+                timestamp = dt_util.utc_from_timestamp(timestamp)
+            daily.append((timestamp, float(value)))
+        return daily
+
+    def _async_write_daily_average(
+        self, daily_energy: list[tuple[datetime, float]]
+    ) -> None:
+        """Publish a horizontal average across all complete collected days."""
+        points = constant_daily_average(sorted(daily_energy))
+        if not points:
+            return
+
+        average_stats = [
+            StatisticData(start=start, mean=value, min=value, max=value)
+            for start, value in points
+        ]
+        async_add_external_statistics(
+            self.hass,
+            self._mean_metadata(
+                self.daily_average_id,
+                "Alexela average daily electricity usage (all history)",
+                UnitOfEnergy.KILO_WATT_HOUR,
+                unit_class="energy",
+            ),
+            average_stats,
+        )
+        _LOGGER.debug(
+            "Alexela statistics: updated all-history daily average across %s day(s)",
+            len(points),
+        )
 
     def _comparison_summary(
         self,
