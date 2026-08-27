@@ -25,12 +25,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from .api import AlexelaApi
-from .analytics import constant_daily_average
+from .analytics import constant_daily_average, rolling_import_days
 from .const import (
     DOMAIN,
-    MAX_BACKFILL_DAYS,
     NORD_POOL_INITIAL_BACKFILL_DAYS,
     PORTAL_TIME_ZONE,
+    RECONCILE_DAYS,
 )
 from .nordpool import (
     NordPoolApi,
@@ -197,7 +197,7 @@ class AlexelaStatisticsImporter:
         )
 
     async def async_update(self, year_payload: dict[str, Any]) -> dict[str, Any]:
-        """Import every published day that is not in statistics yet."""
+        """Backfill published history and reconcile the recent rolling tail."""
         zone = await dt_util.async_get_time_zone(PORTAL_TIME_ZONE) or dt_util.UTC
         last_energy = await self._async_last_statistic(self.energy_id)
         last_cost = await self._async_last_statistic(self.cost_id)
@@ -240,12 +240,63 @@ class AlexelaStatisticsImporter:
                 last_nord_pool_cost, last_difference, last_nord_pool_price
             )
 
-        _LOGGER.debug("Alexela statistics: %s day(s) to import", len(days))
+        _LOGGER.debug(
+            "Alexela statistics: %s day(s) to import or reconcile", len(days)
+        )
         daily_energy = await self._async_daily_energy()
-        energy_sum = last_energy[1] if last_energy else 0.0
-        cost_sum = last_cost[1] if last_cost else 0.0
-        nord_pool_cost_sum = last_nord_pool_cost[1] if last_nord_pool_cost else 0.0
-        difference_sum = last_difference[1] if last_difference else 0.0
+        reconcile_start = reference_datetime().date() - timedelta(
+            days=RECONCILE_DAYS - 1
+        )
+        energy_days = {
+            day
+            for day in days
+            if imported_through is None
+            or day > imported_through
+            or day >= reconcile_start
+        }
+        comparison_days = {
+            day
+            for day in days
+            if day > comparison_cursor or day >= reconcile_start
+        }
+        energy_start = (
+            datetime.combine(
+                min(energy_days), datetime.min.time(), zone
+            ).astimezone(dt_util.UTC)
+            if energy_days
+            else None
+        )
+        comparison_start = (
+            datetime.combine(
+                min(comparison_days), datetime.min.time(), zone
+            ).astimezone(dt_util.UTC)
+            if comparison_days
+            else None
+        )
+        energy_sum = (
+            await self._async_running_sum_before(self.energy_id, energy_start)
+            if energy_start is not None
+            else last_energy[1] if last_energy else 0.0
+        )
+        cost_sum = (
+            await self._async_running_sum_before(self.cost_id, energy_start)
+            if energy_start is not None
+            else last_cost[1] if last_cost else 0.0
+        )
+        nord_pool_cost_sum = (
+            await self._async_running_sum_before(
+                self.nord_pool_cost_id, comparison_start
+            )
+            if comparison_start is not None
+            else last_nord_pool_cost[1] if last_nord_pool_cost else 0.0
+        )
+        difference_sum = (
+            await self._async_running_sum_before(
+                self.nord_pool_difference_id, comparison_start
+            )
+            if comparison_start is not None
+            else last_difference[1] if last_difference else 0.0
+        )
         energy_stats: list[StatisticData] = []
         cost_stats: list[StatisticData] = []
         nord_pool_price_stats: list[StatisticData] = []
@@ -261,7 +312,16 @@ class AlexelaStatisticsImporter:
                     f"{day.isoformat()} 00:00:00", "day"
                 )
             )
-            buckets = hourly_buckets(payload, zone)
+            try:
+                buckets = hourly_buckets(payload, zone)
+            except (KeyError, TypeError, ValueError) as err:
+                _LOGGER.warning(
+                    "Could not parse Alexela readings for %s (%s); pausing "
+                    "the statistics import there and retrying later",
+                    day,
+                    err,
+                )
+                break
             if not buckets:
                 # Alexela answers HTTP 200 with an empty payload when it is
                 # having a bad moment. Stop here rather than stepping over the
@@ -274,7 +334,12 @@ class AlexelaStatisticsImporter:
                 )
                 break
 
-            if imported_through is None or day > imported_through:
+            if day in energy_days:
+                daily_energy = [
+                    item
+                    for item in daily_energy
+                    if item[0].astimezone(zone).date() != day
+                ]
                 daily_energy.append(
                     (buckets[0][0], sum(energy for _, energy, _ in buckets))
                 )
@@ -288,7 +353,7 @@ class AlexelaStatisticsImporter:
                         StatisticData(start=hour, state=cost, sum=cost_sum)
                     )
 
-            if not comparison_paused and day > comparison_cursor:
+            if not comparison_paused and day in comparison_days:
                 try:
                     prices = await self.nord_pool_api.async_get_day_ahead_prices(day)
                     comparison_buckets = nord_pool_hourly_buckets(payload, prices, zone)
@@ -328,6 +393,9 @@ class AlexelaStatisticsImporter:
                         )
 
         if energy_stats:
+            # Home Assistant updates an existing external-statistics row when
+            # its statistic ID and timestamp match, so the reconciled tail
+            # replaces stale values instead of creating duplicate history.
             async_add_external_statistics(
                 self.hass,
                 self._sum_metadata(
@@ -457,6 +525,45 @@ class AlexelaStatisticsImporter:
         value = entries[0].get(value_field)
         return (start, float(value)) if value is not None else None
 
+    async def _async_running_sum_before(
+        self, statistic_id: str, start: datetime
+    ) -> float:
+        """Return the cumulative value immediately before a rewritten tail."""
+        rows = await get_instance(self.hass).async_add_executor_job(
+            statistics_during_period,
+            self.hass,
+            start,
+            start + timedelta(hours=1),
+            {statistic_id},
+            "hour",
+            None,
+            {"state", "sum"},
+        )
+        entries = rows.get(statistic_id, [])
+        if entries:
+            first = entries[0]
+            if first.get("sum") is not None and first.get("state") is not None:
+                return float(first["sum"]) - float(first["state"])
+
+        # A newly published day has no row at its first timestamp. The prior
+        # two-hour window covers the normal previous hour and DST transitions.
+        rows = await get_instance(self.hass).async_add_executor_job(
+            statistics_during_period,
+            self.hass,
+            start - timedelta(hours=2),
+            start,
+            {statistic_id},
+            "hour",
+            None,
+            {"sum"},
+        )
+        previous = [
+            float(row["sum"])
+            for row in rows.get(statistic_id, [])
+            if row.get("sum") is not None
+        ]
+        return previous[-1] if previous else 0.0
+
     async def _async_daily_energy(self) -> list[tuple[datetime, float]]:
         """Return every complete daily energy change already in the recorder."""
         rows = await get_instance(self.hass).async_add_executor_job(
@@ -529,13 +636,19 @@ class AlexelaStatisticsImporter:
         zone: tzinfo,
         imported_through: date | None,
     ) -> list[date]:
-        """Return the published days still missing from statistics.
+        """Return the contiguous backfill or rolling reconciliation days.
 
         The monthly view is what says which days exist, so a day Alexela never
-        published is never waited for, while a day it does have is retried until
-        it actually arrives.
+        published is never waited for. Once caught up, this same scan discovers
+        new days and revisions within the latest reconciliation window.
         """
         newest = reference_datetime().date()  # Alexela is a day behind
+        reconcile_start = newest - timedelta(days=RECONCILE_DAYS - 1)
+        earliest_needed = (
+            min(imported_through + timedelta(days=1), reconcile_start)
+            if imported_through is not None
+            else None
+        )
         months = [
             timestamp.date()
             for row in block_rows(total_block(year_payload))
@@ -544,10 +657,11 @@ class AlexelaStatisticsImporter:
 
         days: list[date] = []
         for month in sorted(months):
-            if imported_through is not None and month <= imported_through.replace(
-                day=1
-            ) - timedelta(days=1):
-                continue  # fully covered by an earlier import
+            if (
+                earliest_needed is not None
+                and month < earliest_needed.replace(day=1)
+            ):
+                continue
 
             await asyncio.sleep(REQUEST_DELAY)
             payload = unwrap_payload(
@@ -557,10 +671,9 @@ class AlexelaStatisticsImporter:
             )
             days.extend(published_days(payload, zone))
 
-        pending = [
-            day
-            for day in sorted(days)
-            if day <= newest
-            and (imported_through is None or day > imported_through)
-        ]
-        return pending[:MAX_BACKFILL_DAYS]
+        return rolling_import_days(
+            days,
+            newest,
+            imported_through,
+            reconcile_days=RECONCILE_DAYS,
+        )

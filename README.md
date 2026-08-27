@@ -21,6 +21,8 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   - Alexela cost difference versus that comparison (`EUR`)
 - Imports Alexela's published 15-minute readings into hourly Home Assistant
   long-term statistics for historical Energy Dashboard data.
+- Uses one rolling 10-day scan to discover new readings and replace recently
+  adjusted readings at their original timestamps.
 - Publishes a horizontal all-history average of complete daily electricity
   usage for daily-consumption charts.
 - Matches each consumption interval to the official Nord Pool Latvia day-ahead
@@ -115,8 +117,12 @@ logger:
 For **Grid consumption**, select:
 
 - **Alexela electricity** (`alexela:<CRM ID>_electricity_energy`) for accurate
-  historical hourly consumption. The integration backfills up to 40 published
-  days per update and continues on later updates until caught up.
+  historical hourly consumption. The initial backfill has no day limit: it
+  follows every published day in order until Alexela returns an empty or
+  malformed daily payload, then retries that boundary on the next update.
+  After the history is contiguous, each update rescans the latest 10 calendar
+  days. This same scan imports newly published days and overwrites adjusted
+  hourly values, rebuilding every affected cumulative total.
 
 For cost configuration, use one of the following approaches:
 
