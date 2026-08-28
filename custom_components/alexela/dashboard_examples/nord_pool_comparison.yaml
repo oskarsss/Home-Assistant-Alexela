@@ -1,67 +1,338 @@
-# Full native Home Assistant view. Replace every REPLACE_WITH_CRM_ID with the
-# CRM ID configured in the Alexela integration, then paste this under `views:`
-# in a raw dashboard configuration (or use the cards individually).
-- title: Alexela vs Nord Pool
-  path: alexela-nord-pool
-  icon: mdi:transmission-tower
-  cards:
-    - type: energy-date-selection
+# Complete responsive Home Assistant dashboard.
+#
+# 1. Replace every REPLACE_WITH_CRM_ID with the CRM ID configured in Alexela.
+# 2. Install "Energy Custom Graph" from HACS for the mixed bar/average chart.
+# 3. Paste this complete file into a dashboard's raw configuration editor.
+views:
+  - title: Overview
+    path: overview
+    type: sections
+    icon: mdi:lightning-bolt
+    max_columns: 3
+    badges:
+      - type: entity
+        entity: sensor.alexela_electricity_cost_this_month
+        name: Month
+        show_name: true
+        show_state: true
+        color: orange
+      - type: entity
+        entity: sensor.alexela_electricity_consumption_this_month
+        name: Usage
+        show_name: true
+        show_state: true
+        color: amber
+      - type: entity
+        entity: sensor.alexela_latest_nord_pool_price_incl_vat
+        name: Latest spot
+        show_name: true
+        show_state: true
+        color: blue
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Cost
+            heading_style: title
+            icon: mdi:cash-multiple
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+            name: This month
+            icon: mdi:calendar-month
+            unit: EUR
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+            name: Last 7 days
+            icon: mdi:calendar-week
+            unit: EUR
+            stat_type: change
+            period:
+              rolling_window:
+                duration:
+                  days: 7
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+            name: This month
+            icon: mdi:meter-electric
+            unit: kWh
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options:
+              columns: 12
+              rows: 2
 
-    - type: grid
-      columns: 3
-      square: false
-      cards:
-        - type: statistic
-          entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
-          name: Alexela cost
-          icon: mdi:cash
-          period: energy_date_selection
-          stat_type: change
-        - type: statistic
-          entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
-          name: Nord Pool + provider markup
-          icon: mdi:chart-line
-          period: energy_date_selection
-          stat_type: change
-        - type: statistic
-          entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool_provider
-          name: Lost (+) / saved (-)
-          icon: mdi:scale-balance
-          period: energy_date_selection
-          stat_type: change
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Daily usage
+            heading_style: title
+            icon: mdi:chart-bar
+          - type: custom:energy-custom-graph-card
+            title: Daily consumption · last 30 days
+            timespan:
+              mode: relative
+              period: last_30_days
+            aggregation:
+              manual: day
+            y_axes:
+              - id: left
+                unit: kWh
+                min: 0
+            series:
+              - statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+                name: Daily usage
+                stat_type: change
+                chart_type: bar
+                color: --energy-grid-consumption-color
+              - statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_daily_average_all_history
+                name: All-time average
+                stat_type: mean
+                chart_type: line
+                color: "#8e44ad"
+            grid_options:
+              columns: full
+              rows: 7
 
-    - type: statistics-graph
-      title: Cost by selected period
-      chart_type: bar
-      energy_date_selection: true
-      entities:
-        - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
-          name: Alexela
-          color: "#ef5350"
-        - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
-          name: Nord Pool incl VAT + provider markup
-          color: "#42a5f5"
-      stat_types:
-        - change
+      - type: grid
+        cards:
+          - type: heading
+            heading: Fixed vs Nord Pool · this month
+            heading_style: title
+            icon: mdi:scale-balance
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+            name: Fixed-price total
+            icon: mdi:shield-check
+            unit: EUR
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options:
+              columns: 12
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
+            name: Nord Pool + markup total
+            icon: mdi:chart-line
+            unit: EUR
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options:
+              columns: 12
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool_provider
+            name: Difference · negative means saved
+            icon: mdi:scale-balance
+            unit: EUR
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options:
+              columns: 12
+              rows: 2
 
-    - type: statistics-graph
-      title: Difference vs Nord Pool
-      chart_type: bar
-      energy_date_selection: true
-      entities:
-        - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool_provider
-          name: Positive = paid more; negative = saved
-          color: "#ab47bc"
-      stat_types:
-        - change
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Price per kWh
+            heading_style: title
+            icon: mdi:currency-eur
+          - type: tile
+            entity: sensor.alexela_electricity_price_this_month
+            name: Fixed effective price · this month
+            icon: mdi:shield-check
+            vertical: false
+            grid_options:
+              columns: 12
+          - type: tile
+            entity: sensor.alexela_latest_nord_pool_price_incl_vat
+            name: Latest matched Nord Pool spot price
+            icon: mdi:transmission-tower
+            vertical: false
+            grid_options:
+              columns: 12
 
-    - type: statistics-graph
-      title: Nord Pool Latvia spot price incl VAT
-      chart_type: line
-      energy_date_selection: true
-      entities:
-        - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_price
-          name: EUR/kWh
-          color: "#26a69a"
-      stat_types:
-        - mean
+  - title: Analytics
+    path: analytics
+    type: sections
+    icon: mdi:chart-box-outline
+    max_columns: 2
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Daily cost
+            heading_style: title
+            icon: mdi:cash-clock
+          - type: statistics-graph
+            title: Fixed cost vs Nord Pool + markup
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+                name: Fixed price
+                color: "#e67e22"
+              - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
+                name: Nord Pool + markup
+                color: "#2980b9"
+            days_to_show: 60
+            chart_type: bar
+            stat_types:
+              - change
+            period: day
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7
+          - type: statistics-graph
+            title: Daily difference
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool_provider
+                name: Positive = fixed cost more
+                color: "#8e44ad"
+            days_to_show: 60
+            chart_type: bar
+            stat_types:
+              - change
+            period: day
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 6
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Running totals
+            heading_style: title
+            icon: mdi:chart-areaspline
+          - type: statistics-graph
+            title: Cumulative cost
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+                name: Fixed price
+                color: "#e67e22"
+              - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
+                name: Nord Pool + markup
+                color: "#2980b9"
+            days_to_show: 90
+            chart_type: line
+            stat_types:
+              - sum
+            period: day
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7
+          - type: statistics-graph
+            title: Cumulative difference
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool_provider
+                name: Fixed minus Nord Pool
+                color: "#8e44ad"
+            days_to_show: 90
+            chart_type: line
+            stat_types:
+              - sum
+            period: day
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 6
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Usage history
+            heading_style: title
+            icon: mdi:meter-electric
+          - type: statistics-graph
+            title: Daily consumption · 90 days
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+                name: kWh
+                color: "#f1c40f"
+            days_to_show: 90
+            chart_type: bar
+            stat_types:
+              - change
+            period: day
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7
+          - type: statistics-graph
+            title: Cumulative consumption
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+                name: kWh
+                color: "#f39c12"
+            days_to_show: 90
+            chart_type: line
+            stat_types:
+              - sum
+            period: day
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 6
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Nord Pool detail
+            heading_style: title
+            icon: mdi:chart-line
+          - type: statistics-graph
+            title: Matched price range by day
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_price
+                name: Nord Pool incl. VAT
+                color: "#2980b9"
+            days_to_show: 60
+            chart_type: line
+            stat_types:
+              - mean
+              - min
+              - max
+            period: day
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7
+          - type: statistics-graph
+            title: Hourly matched price · 7 days
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_price
+                name: EUR/kWh
+                color: "#2980b9"
+            days_to_show: 7
+            chart_type: line
+            stat_types:
+              - mean
+            period: hour
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7

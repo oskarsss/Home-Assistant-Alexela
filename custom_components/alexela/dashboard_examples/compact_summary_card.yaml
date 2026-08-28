@@ -1,16 +1,23 @@
-# A compact card using the normal sensor entities. Home Assistant usually
-# assigns these entity IDs. Check Settings -> Devices & services -> Alexela and
-# adjust them if your installation added a suffix or you renamed an entity.
-type: entities
-title: Alexela vs Nord Pool
-show_header_toggle: false
-entities:
-  - entity: sensor.alexela_latest_nord_pool_price_incl_vat
-    name: Latest matched spot price
-    icon: mdi:lightning-bolt
-  - entity: sensor.alexela_nord_pool_reference_cost_incl_vat
-    name: Nord Pool + provider markup
-    icon: mdi:chart-line
-  - entity: sensor.alexela_electricity_cost_difference_vs_nord_pool
-    name: Lost (+) / saved (-)
-    icon: mdi:scale-balance
+# Compact portable summary using only normal Alexela sensor entities.
+# Check Settings -> Devices & services -> Alexela if HA added a suffix or an
+# entity was renamed locally.
+type: grid
+columns: 2
+square: false
+cards:
+  - type: tile
+    entity: sensor.alexela_electricity_consumption_this_month
+    name: Usage · this month
+    icon: mdi:meter-electric
+  - type: tile
+    entity: sensor.alexela_electricity_cost_this_month
+    name: Cost · this month
+    icon: mdi:cash
+  - type: tile
+    entity: sensor.alexela_electricity_price_this_month
+    name: Effective price · this month
+    icon: mdi:shield-check
+  - type: tile
+    entity: sensor.alexela_latest_nord_pool_price_incl_vat
+    name: Latest Nord Pool spot
+    icon: mdi:transmission-tower

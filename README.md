@@ -30,6 +30,19 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   hourly spot-price, reference-cost and cost-difference statistics.
 - Supports Home Assistant reauthentication if the stored JWT becomes invalid.
 
+## Latest updates
+
+- The initial consumption backfill is unlimited and begins at the first day
+  Alexela actually lists for the account. It proceeds chronologically until an
+  empty or malformed daily response is encountered, then retries that boundary.
+- A rolling 10-day scan is now the normal ingestion path for both newly
+  published days and later Alexela adjustments. Matching Home Assistant rows
+  are replaced and every affected cumulative total is rebuilt.
+- The maintained dashboard example now mirrors the polished two-view
+  `sections` dashboard: responsive Overview and Analytics pages, consistent
+  month-scoped comparisons, daily usage with an all-history average, and
+  detailed usage, cost, difference, and Nord Pool graphs.
+
 ## Installation
 
 ### HACS (custom repository)
@@ -190,18 +203,19 @@ HACS installs two ready-to-copy examples inside
 `custom_components/alexela/dashboard_examples/`:
 
 - [`nord_pool_comparison.yaml`](custom_components/alexela/dashboard_examples/nord_pool_comparison.yaml)
-  is a complete native Home Assistant view with a date picker, selected-period
-  totals, comparison bars and a spot-price graph. Replace
-  `REPLACE_WITH_CRM_ID` with the CRM ID used by this integration before pasting
-  it under `views:` in a dashboard's raw configuration.
+  is a complete responsive two-view dashboard using Home Assistant's modern
+  `sections` layout. Replace `REPLACE_WITH_CRM_ID` with the configured CRM ID,
+  then paste the complete file into a dashboard's raw configuration editor.
 - [`compact_summary_card.yaml`](custom_components/alexela/dashboard_examples/compact_summary_card.yaml)
-  is a small entities card for the three live summary sensors. Check the
-  generated entity IDs under **Settings -> Devices & services -> Alexela** if
-  Home Assistant renamed or suffixed them.
+  is a responsive four-tile summary for current usage, cost, effective price,
+  and the latest matched Nord Pool spot price.
 
 HACS custom integrations are installed under `custom_components/`; they do not
-automatically edit a user's dashboard. The examples use only built-in Home
-Assistant cards, so no separate dashboard-card dependency is required.
+automatically edit a user's dashboard. The full example uses built-in cards
+except for its mixed daily-usage/all-history-average chart, which requires the
+**Energy Custom Graph** card from HACS. See the examples'
+[`README`](custom_components/alexela/dashboard_examples/README.md) for setup
+and portability details.
 
 ## Authentication and token rotation
 
@@ -241,8 +255,8 @@ The integration cannot create a new Alexela login session from username/password
 - Consumption data is a day or more behind. Summary sensors are monthly; the
   imported long-term statistics are hourly totals built from 15-minute data.
 - Does not perform a fresh Alexela login.
-- Backfill is limited to 40 days per update to avoid overwhelming the private
-  API. Empty successful responses pause the import and are retried later.
+- The initial backfill has no day limit and spaces daily requests by one second.
+  Empty or malformed daily responses pause the import and are retried later.
 - Exposes aggregate electricity data rather than a device per contract/consumption location.
 - Gas consumption is not exposed yet.
 - Alexela can change the API without notice.
