@@ -29,6 +29,7 @@ from .analytics import (
     align_hourly_profile_to_intervals,
     constant_daily_average,
     monthly_daily_profile,
+    recorded_month_records,
     recorded_month_totals,
     rolling_import_days,
     typical_hourly_profile,
@@ -909,6 +910,19 @@ class AlexelaStatisticsImporter:
             if daily_cost
             else None
         )
+        month_records = recorded_month_records(daily_energy, zone)
+        complete_month_records = [
+            item for item in month_records if item["complete"]
+        ]
+        ranked_months = sorted(
+            complete_month_records, key=lambda item: item["kwh"], reverse=True
+        )
+        minimum_month = min(
+            complete_month_records, key=lambda item: item["kwh"], default=None
+        )
+        maximum_month = max(
+            complete_month_records, key=lambda item: item["kwh"], default=None
+        )
         return {
             "reference_cost": cost[1] if cost else None,
             "difference": difference[1] if difference else None,
@@ -953,6 +967,29 @@ class AlexelaStatisticsImporter:
                 if energy_month_totals
                 else None
             ),
+            "minimum_recorded_month_kwh": (
+                minimum_month["kwh"] if minimum_month else None
+            ),
+            "minimum_recorded_month_label": (
+                minimum_month["month"] if minimum_month else None
+            ),
+            "maximum_recorded_month_kwh": (
+                maximum_month["kwh"] if maximum_month else None
+            ),
+            "maximum_recorded_month_label": (
+                maximum_month["month"] if maximum_month else None
+            ),
+            "months_by_consumption": [
+                {**item, "rank": rank}
+                for rank, item in enumerate(ranked_months, start=1)
+            ],
+            "months_by_consumption_ascending": [
+                {**item, "rank": rank}
+                for rank, item in enumerate(reversed(ranked_months), start=1)
+            ],
+            "months_chronological": list(reversed(month_records)),
+            "recorded_month_count": len(month_records),
+            "completed_month_count": len(complete_month_records),
             "recorded_month_cost_average": (
                 sum(value for _, value in cost_month_totals)
                 / len(cost_month_totals)

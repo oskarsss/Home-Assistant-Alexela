@@ -307,36 +307,42 @@ views:
             grid_options:
               columns: 6
               rows: 2
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_recorded_month_total
+          - type: tile
+            entity: sensor.alexela_recorded_monthly_average
             name: Monthly average
             icon: mdi:chart-bell-curve
-            unit: kWh
-            stat_type: mean
-            period:
-              fixed_period: {}
+            state_content:
+              - state
+              - month_label
+            tap_action:
+              action: navigate
+              navigation_path: /alexela-energy/monthly-history
             grid_options:
               columns: 4
               rows: 2
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_recorded_month_total
+          - type: tile
+            entity: sensor.alexela_minimum_recorded_month
             name: Minimum month
             icon: mdi:arrow-collapse-down
-            unit: kWh
-            stat_type: min
-            period:
-              fixed_period: {}
+            state_content:
+              - state
+              - month_label
+            tap_action:
+              action: navigate
+              navigation_path: /alexela-energy/monthly-lowest
             grid_options:
               columns: 4
               rows: 2
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_recorded_month_total
+          - type: tile
+            entity: sensor.alexela_maximum_recorded_month
             name: Maximum month
             icon: mdi:arrow-expand-up
-            unit: kWh
-            stat_type: max
-            period:
-              fixed_period: {}
+            state_content:
+              - state
+              - month_label
+            tap_action:
+              action: navigate
+              navigation_path: /alexela-energy/monthly-highest
             grid_options:
               columns: 4
               rows: 2
@@ -626,3 +632,115 @@ views:
             grid_options:
               columns: full
               rows: 7
+
+  - title: Monthly history
+    path: monthly-history
+    type: sections
+    subview: true
+    back_path: /alexela-energy/analytics
+    max_columns: 2
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Recorded months
+            heading_style: title
+            icon: mdi:calendar-multiple
+          - type: tile
+            entity: sensor.alexela_recorded_monthly_average
+            name: Monthly average
+            state_content:
+              - state
+              - month_label
+            grid_options:
+              columns: full
+          - type: markdown
+            content: |-
+              {% set months = state_attr('sensor.alexela_recorded_monthly_average', 'months') or [] %}
+              | Month | Consumption |
+              |:--|--:|
+              {% for item in months %}
+              | {{ item.month }}{% if not item.complete %} *(partial)*{% endif %} | {{ item.kwh | round(2) }} kWh |
+              {% else %}
+              | No recorded months yet | — |
+              {% endfor %}
+            entity_id:
+              - sensor.alexela_recorded_monthly_average
+            grid_options:
+              columns: full
+
+  - title: Lowest months
+    path: monthly-lowest
+    type: sections
+    subview: true
+    back_path: /alexela-energy/analytics
+    max_columns: 2
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Lowest completed months
+            heading_style: title
+            icon: mdi:sort-ascending
+          - type: tile
+            entity: sensor.alexela_minimum_recorded_month
+            name: Minimum month
+            state_content:
+              - state
+              - month_label
+            grid_options:
+              columns: full
+          - type: markdown
+            content: |-
+              {% set months = state_attr('sensor.alexela_minimum_recorded_month', 'months') or [] %}
+              Incomplete calendar months are excluded.
+
+              | Rank | Month | Consumption |
+              |--:|:--|--:|
+              {% for item in months %}
+              | {{ item.rank }} | {{ item.month }} | {{ item.kwh | round(2) }} kWh |
+              {% else %}
+              | — | No completed months yet | — |
+              {% endfor %}
+            entity_id:
+              - sensor.alexela_minimum_recorded_month
+            grid_options:
+              columns: full
+
+  - title: Highest months
+    path: monthly-highest
+    type: sections
+    subview: true
+    back_path: /alexela-energy/analytics
+    max_columns: 2
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Highest completed months
+            heading_style: title
+            icon: mdi:sort-descending
+          - type: tile
+            entity: sensor.alexela_maximum_recorded_month
+            name: Maximum month
+            state_content:
+              - state
+              - month_label
+            grid_options:
+              columns: full
+          - type: markdown
+            content: |-
+              {% set months = state_attr('sensor.alexela_maximum_recorded_month', 'months') or [] %}
+              Incomplete calendar months are excluded.
+
+              | Rank | Month | Consumption |
+              |--:|:--|--:|
+              {% for item in months %}
+              | {{ item.rank }} | {{ item.month }} | {{ item.kwh | round(2) }} kWh |
+              {% else %}
+              | — | No completed months yet | — |
+              {% endfor %}
+            entity_id:
+              - sensor.alexela_maximum_recorded_month
+            grid_options:
+              columns: full

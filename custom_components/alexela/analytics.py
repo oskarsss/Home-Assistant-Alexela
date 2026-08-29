@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import calendar
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta, tzinfo
+from typing import Any
 
 
 def constant_daily_average(
@@ -78,6 +80,34 @@ def recorded_month_totals(
         (min(start for start, _ in values), sum(value for _, value in values))
         for _, values in sorted(grouped.items())
     ]
+
+
+def recorded_month_records(
+    daily_totals: Sequence[tuple[datetime, float]], zone: tzinfo
+) -> list[dict[str, Any]]:
+    """Return labelled month totals and whether every calendar day exists."""
+    records: list[dict[str, Any]] = []
+    for start, value in recorded_month_totals(daily_totals, zone):
+        local = start.astimezone(zone)
+        days = {
+            item_start.astimezone(zone).day
+            for item_start, _ in daily_totals
+            if (
+                item_start.astimezone(zone).year,
+                item_start.astimezone(zone).month,
+            )
+            == (local.year, local.month)
+        }
+        records.append(
+            {
+                "month": local.strftime("%B %Y"),
+                "start": start.isoformat(),
+                "kwh": value,
+                "complete": len(days)
+                == calendar.monthrange(local.year, local.month)[1],
+            }
+        )
+    return records
 
 
 def align_hourly_profile_to_intervals(

@@ -201,6 +201,36 @@ SENSORS: tuple[AlexelaSensorDescription, ...] = (
         value_fn=_latest_day_energy,
     ),
     AlexelaSensorDescription(
+        key="electricity_recorded_month_average",
+        name="Recorded monthly average",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: _nord_pool_summary_value(
+            data, "recorded_month_energy_average"
+        ),
+    ),
+    AlexelaSensorDescription(
+        key="electricity_recorded_month_minimum",
+        name="Minimum recorded month",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: _nord_pool_summary_value(
+            data, "minimum_recorded_month_kwh"
+        ),
+    ),
+    AlexelaSensorDescription(
+        key="electricity_recorded_month_maximum",
+        name="Maximum recorded month",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=lambda data: _nord_pool_summary_value(
+            data, "maximum_recorded_month_kwh"
+        ),
+    ),
+    AlexelaSensorDescription(
         key="nord_pool_price_latest",
         name="Latest Nord Pool price incl VAT",
         state_class=SensorStateClass.MEASUREMENT,
@@ -251,6 +281,7 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
             "monthly_daily_profile",
             "chart_explanation",
             "average_basis",
+            "months",
         }
     )
 
@@ -352,6 +383,49 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
                     "line is the all-history average for the matching weekday "
                     "and time band: night, morning, daytime, or evening."
                 ),
+            }
+        if self.entity_description.key in (
+            "electricity_recorded_month_average",
+            "electricity_recorded_month_minimum",
+            "electricity_recorded_month_maximum",
+        ):
+            if not isinstance(summary, dict):
+                return None
+            if self.entity_description.key == "electricity_recorded_month_average":
+                count = int(summary.get("recorded_month_count") or 0)
+                return {
+                    "month_label": (
+                        f"Across {count} recorded month"
+                        f"{'s' if count != 1 else ''}"
+                    ),
+                    "months": summary.get("months_chronological", []),
+                    "ranking_order": "newest first",
+                    "recorded_month_count": count,
+                }
+            is_minimum = (
+                self.entity_description.key == "electricity_recorded_month_minimum"
+            )
+            label_key = (
+                "minimum_recorded_month_label"
+                if is_minimum
+                else "maximum_recorded_month_label"
+            )
+            months_key = (
+                "months_by_consumption_ascending"
+                if is_minimum
+                else "months_by_consumption"
+            )
+            return {
+                "month_label": summary.get(label_key)
+                or "No completed months yet",
+                "months": summary.get(months_key, []),
+                "ranking_order": (
+                    "lowest to highest" if is_minimum else "highest to lowest"
+                ),
+                "completed_month_count": int(
+                    summary.get("completed_month_count") or 0
+                ),
+                "data_note": "Incomplete calendar months are excluded",
             }
         if self.entity_description.key in (
             "nord_pool_price_latest",

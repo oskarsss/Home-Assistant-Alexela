@@ -19,6 +19,7 @@ align_hourly_profile_to_intervals = ANALYTICS.align_hourly_profile_to_intervals
 constant_daily_average = ANALYTICS.constant_daily_average
 monthly_daily_profile = ANALYTICS.monthly_daily_profile
 recorded_month_totals = ANALYTICS.recorded_month_totals
+recorded_month_records = ANALYTICS.recorded_month_records
 rolling_import_days = ANALYTICS.rolling_import_days
 typical_hourly_profile = ANALYTICS.typical_hourly_profile
 
@@ -81,6 +82,25 @@ class MonthlyProfilesTest(unittest.TestCase):
             recorded_month_totals(samples, timezone.utc),
             [(samples[0][0], 6.0), (samples[2][0], 9.0)],
         )
+
+    def test_recorded_month_records_mark_only_full_calendar_months_complete(self):
+        january = [
+            (datetime(2026, 1, day, tzinfo=timezone.utc), 1.0)
+            for day in range(1, 32)
+        ]
+        partial_february = [
+            (datetime(2026, 2, day, tzinfo=timezone.utc), 2.0)
+            for day in range(1, 11)
+        ]
+
+        records = recorded_month_records(
+            january + partial_february, timezone.utc
+        )
+
+        self.assertEqual(records[0]["month"], "January 2026")
+        self.assertTrue(records[0]["complete"])
+        self.assertEqual(records[1]["month"], "February 2026")
+        self.assertFalse(records[1]["complete"])
 
 
 class AlignHourlyProfileTest(unittest.TestCase):
