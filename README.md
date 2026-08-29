@@ -40,8 +40,10 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   are replaced and every affected cumulative total is rebuilt.
 - The maintained dashboard example now mirrors the polished two-view
   `sections` dashboard: responsive Overview and Analytics pages, consistent
-  month-scoped comparisons, daily usage with an all-history average, and
-  detailed usage, cost, difference, and Nord Pool graphs.
+  month-scoped comparisons, the latest available 48 hours of consumption with
+  an all-history hourly-average line on the Overview page, daily usage with an
+  all-history daily average, and detailed usage, cost, difference, and Nord
+  Pool graphs.
 
 ## Installation
 
@@ -154,6 +156,11 @@ The same value is written for every collected day so it renders as a horizontal
 reference line beside daily `change` bars. It updates whenever a new day is
 imported; Alexela's usual one-day publication delay still applies.
 
+Hourly usage charts can use
+`alexela:<CRM ID>_electricity_hourly_average_all_history`. Its value is the
+average kWh across every collected hourly reading, written at every collected
+hour so the reference line remains visible alongside hourly `change` bars.
+
 ## Nord Pool comparison
 
 For every published Alexela consumption interval, the integration looks up the
@@ -212,8 +219,8 @@ HACS installs two ready-to-copy examples inside
 
 HACS custom integrations are installed under `custom_components/`; they do not
 automatically edit a user's dashboard. The full example uses built-in cards
-except for its mixed daily-usage/all-history-average chart, which requires the
-**Energy Custom Graph** card from HACS. See the examples'
+except for its latest-48-hour and mixed daily-usage/all-history-average charts,
+which require the **Energy Custom Graph** card from HACS. See the examples'
 [`README`](custom_components/alexela/dashboard_examples/README.md) for setup
 and portability details.
 

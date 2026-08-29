@@ -16,6 +16,7 @@ def _load_analytics_module():
 
 ANALYTICS = _load_analytics_module()
 constant_daily_average = ANALYTICS.constant_daily_average
+constant_hourly_average = ANALYTICS.constant_hourly_average
 rolling_import_days = ANALYTICS.rolling_import_days
 
 
@@ -31,6 +32,21 @@ class ConstantDailyAverageTest(unittest.TestCase):
 
     def test_empty_history_has_no_average(self):
         self.assertEqual(constant_daily_average([]), [])
+
+
+class ConstantHourlyAverageTest(unittest.TestCase):
+    def test_returns_horizontal_average_for_every_collected_hour(self):
+        starts = [
+            datetime(2026, 8, 1, hour, tzinfo=timezone.utc)
+            for hour in range(4)
+        ]
+
+        result = constant_hourly_average(list(zip(starts, (0.1, 0.2, 0.3, 0.4))))
+
+        self.assertEqual(result, [(start, 0.25) for start in starts])
+
+    def test_empty_history_has_no_average(self):
+        self.assertEqual(constant_hourly_average([]), [])
 
 
 class RollingImportDaysTest(unittest.TestCase):

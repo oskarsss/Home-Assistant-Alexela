@@ -17,6 +17,17 @@ def constant_daily_average(
     return [(start, average) for start, _ in daily_totals]
 
 
+def constant_hourly_average(
+    hourly_totals: Sequence[tuple[datetime, float]],
+) -> list[tuple[datetime, float]]:
+    """Return one constant all-history average point for every collected hour."""
+    if not hourly_totals:
+        return []
+
+    average = sum(value for _, value in hourly_totals) / len(hourly_totals)
+    return [(start, average) for start, _ in hourly_totals]
+
+
 def rolling_import_days(
     published: list[date],
     newest: date,

@@ -77,9 +77,49 @@ views:
         column_span: 2
         cards:
           - type: heading
-            heading: Daily usage
+            heading: Consumption history
             heading_style: title
             icon: mdi:chart-bar
+          - type: custom:energy-custom-graph-card
+            title: Hourly consumption · latest available 48 hours
+            timespan:
+              mode: relative
+              period: day
+              count: 2
+              offset: -2
+            aggregation:
+              manual: hour
+            header:
+              chip:
+                label: 48 h total
+                unit: kWh
+                precision: 2
+                metric:
+                  source: series
+                  series_id: hourly_usage
+                  reducer: sum
+            y_axes:
+              - id: left
+                unit: kWh
+                min: 0
+            series:
+              - id: hourly_usage
+                statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+                name: Hourly usage
+                stat_type: change
+                chart_type: bar
+                color: "#f1c40f"
+              - id: hourly_all_time_average
+                statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_hourly_average_all_history
+                name: All-time hourly average
+                stat_type: mean
+                chart_type: line
+                color: "#8e44ad"
+                smooth: false
+                line_width: 2
+            grid_options:
+              columns: full
+              rows: 7
           - type: custom:energy-custom-graph-card
             title: Daily consumption · last 30 days
             timespan:

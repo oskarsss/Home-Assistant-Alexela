@@ -8,9 +8,10 @@ alter an existing Home Assistant dashboard automatically.
 `nord_pool_comparison.yaml` is a responsive, two-view dashboard based on the
 current Home Assistant `sections` layout:
 
-- **Overview** — current-month and seven-day totals, a 30-day daily-usage chart
-  with the all-history average, a same-period fixed-vs-Nord-Pool comparison,
-  and clearly scoped price tiles.
+- **Overview** — current-month and seven-day totals, an hourly chart for the
+  latest available 48 hours with an all-history hourly-average line, a 30-day
+  daily-usage chart with the all-history daily average, a same-period
+  fixed-vs-Nord-Pool comparison, and clearly scoped price tiles.
 - **Analytics** — daily and cumulative cost comparisons, signed savings/loss,
   90-day usage history, and daily/hourly Nord Pool price detail.
 
@@ -20,8 +21,9 @@ displayed difference reconciles with the two displayed totals.
 
 ### Install
 
-1. Install **Energy Custom Graph** from HACS. It supplies the mixed daily bar
-   and all-history-average line chart used on the Overview page.
+1. Install **Energy Custom Graph** from HACS. It supplies the latest-48-hour
+   chart and the mixed daily bar/all-history-average line chart used on the
+   Overview page.
 2. Open `nord_pool_comparison.yaml` and replace every
    `REPLACE_WITH_CRM_ID` with the CRM ID configured in Alexela.
 3. Create or open a dashboard, choose **Edit dashboard -> Raw configuration
