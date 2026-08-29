@@ -16,8 +16,8 @@ def _load_analytics_module():
 
 ANALYTICS = _load_analytics_module()
 constant_daily_average = ANALYTICS.constant_daily_average
-constant_hourly_average = ANALYTICS.constant_hourly_average
 rolling_import_days = ANALYTICS.rolling_import_days
+typical_hourly_profile = ANALYTICS.typical_hourly_profile
 
 
 class ConstantDailyAverageTest(unittest.TestCase):
@@ -34,19 +34,26 @@ class ConstantDailyAverageTest(unittest.TestCase):
         self.assertEqual(constant_daily_average([]), [])
 
 
-class ConstantHourlyAverageTest(unittest.TestCase):
-    def test_returns_horizontal_average_for_every_collected_hour(self):
-        starts = [
-            datetime(2026, 8, 1, hour, tzinfo=timezone.utc)
-            for hour in range(4)
+class TypicalHourlyProfileTest(unittest.TestCase):
+    def test_splits_time_of_day_and_weekends(self):
+        samples = [
+            (datetime(2026, 8, 3, 7, tzinfo=timezone.utc), 0.1),
+            (datetime(2026, 8, 4, 7, tzinfo=timezone.utc), 0.3),
+            (datetime(2026, 8, 8, 7, tzinfo=timezone.utc), 0.8),
+            (datetime(2026, 8, 3, 18, tzinfo=timezone.utc), 0.4),
         ]
 
-        result = constant_hourly_average(list(zip(starts, (0.1, 0.2, 0.3, 0.4))))
+        result = typical_hourly_profile(samples, timezone.utc)
 
-        self.assertEqual(result, [(start, 0.25) for start in starts])
+        self.assertEqual(result, [
+            (samples[0][0], 0.2),
+            (samples[1][0], 0.2),
+            (samples[2][0], 0.8),
+            (samples[3][0], 0.4),
+        ])
 
     def test_empty_history_has_no_average(self):
-        self.assertEqual(constant_hourly_average([]), [])
+        self.assertEqual(typical_hourly_profile([], timezone.utc), [])
 
 
 class RollingImportDaysTest(unittest.TestCase):

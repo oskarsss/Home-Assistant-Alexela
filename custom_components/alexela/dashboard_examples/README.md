@@ -9,8 +9,8 @@ alter an existing Home Assistant dashboard automatically.
 current Home Assistant `sections` layout:
 
 - **Overview** — current-month and seven-day totals, an hourly chart for the
-  latest available 48 hours with an all-history hourly-average line, a 30-day
-  daily-usage chart with the all-history daily average, a same-period
+  latest available 48 hours with an all-history weekday/weekend usage profile,
+  a 30-day daily-usage chart with the all-history daily average, a same-period
   fixed-vs-Nord-Pool comparison, and clearly scoped price tiles.
 - **Analytics** — daily and cumulative cost comparisons, signed savings/loss,
   90-day usage history, and daily/hourly Nord Pool price detail.

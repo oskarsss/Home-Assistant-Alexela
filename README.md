@@ -41,9 +41,9 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
 - The maintained dashboard example now mirrors the polished two-view
   `sections` dashboard: responsive Overview and Analytics pages, consistent
   month-scoped comparisons, the latest available 48 hours of consumption with
-  an all-history hourly-average line on the Overview page, daily usage with an
-  all-history daily average, and detailed usage, cost, difference, and Nord
-  Pool graphs.
+  an all-history weekday/weekend usage profile on the Overview page, daily
+  usage with an all-history daily average, and detailed usage, cost,
+  difference, and Nord Pool graphs.
 
 ## Installation
 
@@ -157,9 +157,11 @@ reference line beside daily `change` bars. It updates whenever a new day is
 imported; Alexela's usual one-day publication delay still applies.
 
 Hourly usage charts can use
-`alexela:<CRM ID>_electricity_hourly_average_all_history`. Its value is the
-average kWh across every collected hourly reading, written at every collected
-hour so the reference line remains visible alongside hourly `change` bars.
+`alexela:<CRM ID>_electricity_typical_hourly_profile_all_history`. It divides
+all collected readings into night (00:00–06:00), morning (06:00–10:00),
+daytime (10:00–17:00), and evening (17:00–24:00), with separate averages for
+weekdays and weekends. The matching value is written at every collected hour
+so it renders as a stepped reference profile alongside hourly `change` bars.
 
 ## Nord Pool comparison
 

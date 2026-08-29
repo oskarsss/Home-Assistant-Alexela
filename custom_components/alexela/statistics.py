@@ -27,8 +27,8 @@ from homeassistant.util import dt as dt_util
 from .api import AlexelaApi
 from .analytics import (
     constant_daily_average,
-    constant_hourly_average,
     rolling_import_days,
+    typical_hourly_profile,
 )
 from .const import (
     DOMAIN,
@@ -189,8 +189,8 @@ class AlexelaStatisticsImporter:
         self.daily_average_id = (
             f"{DOMAIN}:{crm_id}_electricity_daily_average_all_history"
         )
-        self.hourly_average_id = (
-            f"{DOMAIN}:{crm_id}_electricity_hourly_average_all_history"
+        self.hourly_profile_id = (
+            f"{DOMAIN}:{crm_id}_electricity_typical_hourly_profile_all_history"
         )
         self.nord_pool_price_id = f"{DOMAIN}:{crm_id}_nord_pool_price"
         # v0.3.2 uses new statistic IDs so existing spot-only v0.3.0/v0.3.1
@@ -218,8 +218,8 @@ class AlexelaStatisticsImporter:
         last_daily_average = await self._async_last_statistic(
             self.daily_average_id, "mean"
         )
-        last_hourly_average = await self._async_last_statistic(
-            self.hourly_average_id, "mean"
+        last_hourly_profile = await self._async_last_statistic(
+            self.hourly_profile_id, "mean"
         )
 
         imported_through = (
@@ -244,11 +244,13 @@ class AlexelaStatisticsImporter:
         )
         days = await self._async_pending_days(year_payload, zone, oldest_through)
         if not days:
-            if last_daily_average is None or last_hourly_average is None:
+            if last_daily_average is None or last_hourly_profile is None:
                 if last_daily_average is None:
                     self._async_write_daily_average(await self._async_daily_energy())
-                if last_hourly_average is None:
-                    self._async_write_hourly_average(await self._async_hourly_energy())
+                if last_hourly_profile is None:
+                    self._async_write_hourly_profile(
+                        await self._async_hourly_energy(), zone
+                    )
             return self._comparison_summary(
                 last_nord_pool_cost, last_difference, last_nord_pool_price
             )
@@ -438,12 +440,12 @@ class AlexelaStatisticsImporter:
                 energy_stats[-1]["start"],
             )
             self._async_write_daily_average(daily_energy)
-            self._async_write_hourly_average(hourly_energy)
+            self._async_write_hourly_profile(hourly_energy, zone)
         else:
             if last_daily_average is None:
                 self._async_write_daily_average(daily_energy)
-            if last_hourly_average is None:
-                self._async_write_hourly_average(hourly_energy)
+            if last_hourly_profile is None:
+                self._async_write_hourly_profile(hourly_energy, zone)
 
         if nord_pool_cost_stats:
             async_add_external_statistics(
@@ -665,11 +667,11 @@ class AlexelaStatisticsImporter:
             len(points),
         )
 
-    def _async_write_hourly_average(
-        self, hourly_energy: list[tuple[datetime, float]]
+    def _async_write_hourly_profile(
+        self, hourly_energy: list[tuple[datetime, float]], zone: tzinfo
     ) -> None:
-        """Publish a horizontal average across all collected hours."""
-        points = constant_hourly_average(sorted(hourly_energy))
+        """Publish weekday/weekend averages for each local time-of-day period."""
+        points = typical_hourly_profile(sorted(hourly_energy), zone)
         if not points:
             return
 
@@ -680,15 +682,15 @@ class AlexelaStatisticsImporter:
         async_add_external_statistics(
             self.hass,
             self._mean_metadata(
-                self.hourly_average_id,
-                "Alexela average hourly electricity usage (all history)",
+                self.hourly_profile_id,
+                "Alexela typical hourly electricity usage (all history)",
                 UnitOfEnergy.KILO_WATT_HOUR,
                 unit_class="energy",
             ),
             average_stats,
         )
         _LOGGER.debug(
-            "Alexela statistics: updated all-history hourly average across %s hour(s)",
+            "Alexela statistics: updated all-history hourly profile across %s hour(s)",
             len(points),
         )
 

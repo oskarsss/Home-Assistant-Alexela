@@ -109,13 +109,12 @@ views:
                 stat_type: change
                 chart_type: bar
                 color: "#f1c40f"
-              - id: hourly_all_time_average
-                statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_hourly_average_all_history
-                name: All-time hourly average
+              - id: typical_hourly_profile
+                statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_typical_hourly_profile_all_history
+                name: Typical usage · weekday/weekend
                 stat_type: mean
-                chart_type: line
+                chart_type: step
                 color: "#8e44ad"
-                smooth: false
                 line_width: 2
             grid_options:
               columns: full

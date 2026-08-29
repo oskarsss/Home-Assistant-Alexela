@@ -17,15 +17,34 @@ def constant_daily_average(
     return [(start, average) for start, _ in daily_totals]
 
 
-def constant_hourly_average(
+def typical_hourly_profile(
     hourly_totals: Sequence[tuple[datetime, float]],
+    zone: tzinfo,
 ) -> list[tuple[datetime, float]]:
-    """Return one constant all-history average point for every collected hour."""
+    """Return the matching weekday/weekend time-of-day average per hour."""
     if not hourly_totals:
         return []
 
-    average = sum(value for _, value in hourly_totals) / len(hourly_totals)
-    return [(start, average) for start, _ in hourly_totals]
+    def bucket(start: datetime) -> tuple[bool, str]:
+        local = start.astimezone(zone)
+        period = (
+            "night"
+            if local.hour < 6
+            else "morning"
+            if local.hour < 10
+            else "daytime"
+            if local.hour < 17
+            else "evening"
+        )
+        return local.weekday() >= 5, period
+
+    grouped: dict[tuple[bool, str], list[float]] = {}
+    for start, value in hourly_totals:
+        grouped.setdefault(bucket(start), []).append(value)
+    averages = {
+        key: sum(values) / len(values) for key, values in grouped.items()
+    }
+    return [(start, averages[bucket(start)]) for start, _ in hourly_totals]
 
 
 def rolling_import_days(
