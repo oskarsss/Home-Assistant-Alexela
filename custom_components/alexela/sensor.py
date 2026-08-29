@@ -247,6 +247,8 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
         {
             "interval_readings",
             "hourly_profile",
+            "daily_readings",
+            "monthly_daily_profile",
             "chart_explanation",
             "average_basis",
         }
@@ -293,21 +295,29 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
             "electricity_cost_last_7_days",
         ) and isinstance(summary, dict):
             if self.entity_description.key == "electricity_month":
-                average = summary.get("month_daily_energy_average")
-                unit = "kWh/day"
-            elif self.entity_description.key == "electricity_cost_month":
-                average = summary.get("month_daily_cost_average")
-                unit = "EUR/day"
-            else:
-                average = summary.get("last_seven_daily_cost_average")
-                unit = "EUR/day"
-            attributes = {
-                "average_per_day": average,
-                "average_per_day_label": (
-                    f"Avg {float(average):.2f} {unit}"
+                average = summary.get("recorded_month_energy_average")
+                label = (
+                    f"Monthly avg {float(average):.2f} kWh"
                     if average is not None
-                    else "Average unavailable"
-                ),
+                    else "Monthly average unavailable"
+                )
+            elif self.entity_description.key == "electricity_cost_month":
+                average = summary.get("recorded_month_cost_average")
+                label = (
+                    f"Monthly avg {float(average):.2f} EUR"
+                    if average is not None
+                    else "Monthly average unavailable"
+                )
+            else:
+                average = summary.get("typical_seven_day_cost")
+                label = (
+                    f"7-day avg {float(average):.2f} EUR"
+                    if average is not None
+                    else "7-day average unavailable"
+                )
+            attributes = {
+                "average_period": average,
+                "average_period_label": label,
             }
             period = _period_start(data)
             if period is not None:
@@ -328,6 +338,10 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
                 "interval_minutes": 15,
                 "interval_readings": summary.get("interval_readings", []),
                 "hourly_profile": summary.get("hourly_profile", []),
+                "daily_readings": summary.get("daily_readings", []),
+                "monthly_daily_profile": summary.get(
+                    "monthly_daily_profile", []
+                ),
                 "all_time_daily_average_kwh": average,
                 "latest_day_vs_average_kwh": difference,
                 "average_basis": (

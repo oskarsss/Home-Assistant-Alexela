@@ -1,7 +1,7 @@
 # Complete responsive Home Assistant dashboard.
 #
 # 1. Replace every REPLACE_WITH_CRM_ID with the CRM ID configured in Alexela.
-# 2. Install "ApexCharts Card" and "Energy Custom Graph" from HACS.
+# 2. Install "ApexCharts Card" from HACS.
 # 3. Paste this complete file into a dashboard's raw configuration editor.
 views:
   - title: Overview
@@ -41,7 +41,7 @@ views:
             icon: mdi:calendar-month
             state_content:
               - state
-              - average_per_day_label
+              - average_period_label
             vertical: false
             grid_options:
               columns: 6
@@ -52,7 +52,7 @@ views:
             icon: mdi:calendar-week
             state_content:
               - state
-              - average_per_day_label
+              - average_period_label
             vertical: false
             grid_options:
               columns: 6
@@ -63,7 +63,7 @@ views:
             icon: mdi:meter-electric
             state_content:
               - state
-              - average_per_day_label
+              - average_period_label
             vertical: false
             grid_options:
               columns: 12
@@ -98,64 +98,74 @@ views:
                 shared: true
               yaxis:
                 min: 0
+                decimalsInFloat: 0
                 title:
-                  text: kWh / 15 min
+                  text: Wh
             series:
               - entity: sensor.alexela_electricity_15_minute_history
                 name: 15-minute usage
                 type: column
                 color: "#f1c40f"
+                unit: Wh
+                float_precision: 0
                 data_generator: |
                   return (entity.attributes.interval_readings || [])
-                    .map((point) => [new Date(point.start).getTime(), point.kwh]);
+                    .map((point) => [new Date(point.start).getTime(), point.kwh * 1000]);
               - entity: sensor.alexela_electricity_15_minute_history
                 name: Typical · weekday and time band
                 type: line
                 color: "#3498db"
                 curve: smooth
                 stroke_width: 3
+                unit: Wh
+                float_precision: 0
                 extend_to: false
                 data_generator: |
                   return (entity.attributes.hourly_profile || [])
-                    .map((point) => [new Date(point.start).getTime(), point.kwh]);
+                    .map((point) => [new Date(point.start).getTime(), point.kwh * 1000]);
             grid_options:
               columns: full
               rows: 7
-          - type: markdown
-            content: >-
-              {% set e = 'sensor.alexela_electricity_15_minute_history' %}
-              **Latest available day:** {{ states(e) | float(0) | round(2) }} kWh
-              · **all-time daily average:**
-              {{ state_attr(e, 'all_time_daily_average_kwh') | float(0) | round(2) }} kWh
-              · **difference:**
-              {{ state_attr(e, 'latest_day_vs_average_kwh') | float(0) | round(2) }} kWh
-            grid_options:
-              columns: full
-              rows: 1
-          - type: custom:energy-custom-graph-card
+          - type: custom:apexcharts-card
             title: Daily consumption · last 30 days
-            timespan:
-              mode: relative
-              period: last_30_days
-            aggregation:
-              manual: day
-            y_axes:
-              - id: left
-                unit: kWh
+            graph_span: 30d
+            span:
+              end: day
+              offset: -1d
+            header:
+              show: true
+              title: Daily consumption · rolling 30 days
+              show_states: false
+            apex_config:
+              chart:
+                height: 380
+              tooltip:
+                shared: true
+              yaxis:
                 min: 0
+                decimalsInFloat: 2
+                title:
+                  text: kWh / day
             series:
-              - statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+              - entity: sensor.alexela_electricity_15_minute_history
                 name: Daily usage
-                stat_type: change
-                chart_type: bar
-                color: --energy-grid-consumption-color
-              - statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_monthly_daily_profile_all_history
-                name: Typical day · calendar month
-                stat_type: mean
-                chart_type: line
+                type: column
+                color: "#64a8d1"
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.daily_readings || [])
+                    .map((point) => [new Date(point.start).getTime(), point.kwh]);
+              - entity: sensor.alexela_electricity_15_minute_history
+                name: Average daily usage · calendar month
+                type: line
                 color: "#3498db"
-                smooth: true
-                line_width: 3
+                curve: smooth
+                stroke_width: 3
+                float_precision: 2
+                extend_to: false
+                data_generator: |
+                  return (entity.attributes.monthly_daily_profile || [])
+                    .map((point) => [new Date(point.start).getTime(), point.kwh]);
             grid_options:
               columns: full
               rows: 7

@@ -560,6 +560,7 @@ class AlexelaStatisticsImporter:
             else last_nord_pool_price
         )
         profile = typical_hourly_profile(sorted(hourly_energy), zone)
+        daily_profile = monthly_daily_profile(sorted(daily_energy), zone)
         newest_interval_day = (
             max(start.astimezone(zone).date() for start, _ in recent_intervals)
             if recent_intervals
@@ -585,6 +586,7 @@ class AlexelaStatisticsImporter:
             hourly_profile=profile,
             daily_energy=daily_energy,
             daily_cost=daily_cost,
+            daily_profile=daily_profile,
             zone=zone,
         )
 
@@ -861,11 +863,13 @@ class AlexelaStatisticsImporter:
         hourly_profile: list[tuple[datetime, float]] | None = None,
         daily_energy: list[tuple[datetime, float]] | None = None,
         daily_cost: list[tuple[datetime, float]] | None = None,
+        daily_profile: list[tuple[datetime, float]] | None = None,
         zone: tzinfo = dt_util.UTC,
     ) -> dict[str, Any]:
         """Build values shown by the lightweight summary sensors."""
         through = cost[0] if cost else None
         daily_energy = sorted(daily_energy or [])
+        daily_profile = daily_profile or monthly_daily_profile(daily_energy, zone)
         daily_average = (
             sum(value for _, value in daily_energy) / len(daily_energy)
             if daily_energy
@@ -894,6 +898,13 @@ class AlexelaStatisticsImporter:
             == latest_month
         ]
         last_seven_cost = [value for _, value in daily_cost[-7:]]
+        energy_month_totals = recorded_month_totals(daily_energy, zone)
+        cost_month_totals = recorded_month_totals(daily_cost, zone)
+        all_time_daily_cost_average = (
+            sum(value for _, value in daily_cost) / len(daily_cost)
+            if daily_cost
+            else None
+        )
         return {
             "reference_cost": cost[1] if cost else None,
             "difference": difference[1] if difference else None,
@@ -909,6 +920,14 @@ class AlexelaStatisticsImporter:
                 {"start": start.isoformat(), "kwh": value / 4}
                 for start, value in (hourly_profile or [])
             ],
+            "daily_readings": [
+                {"start": start.isoformat(), "kwh": value}
+                for start, value in daily_energy[-45:]
+            ],
+            "monthly_daily_profile": [
+                {"start": start.isoformat(), "kwh": value}
+                for start, value in (daily_profile or [])[-45:]
+            ],
             "daily_average": daily_average,
             "latest_day": latest_day[0].isoformat() if latest_day else None,
             "latest_day_kwh": latest_day[1] if latest_day else None,
@@ -922,6 +941,23 @@ class AlexelaStatisticsImporter:
             "last_seven_daily_cost_average": (
                 sum(last_seven_cost) / len(last_seven_cost)
                 if last_seven_cost
+                else None
+            ),
+            "recorded_month_energy_average": (
+                sum(value for _, value in energy_month_totals)
+                / len(energy_month_totals)
+                if energy_month_totals
+                else None
+            ),
+            "recorded_month_cost_average": (
+                sum(value for _, value in cost_month_totals)
+                / len(cost_month_totals)
+                if cost_month_totals
+                else None
+            ),
+            "typical_seven_day_cost": (
+                all_time_daily_cost_average * 7
+                if all_time_daily_cost_average is not None
                 else None
             ),
         }

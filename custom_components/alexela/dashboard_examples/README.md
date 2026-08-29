@@ -8,7 +8,7 @@ alter an existing Home Assistant dashboard automatically.
 `nord_pool_comparison.yaml` is a responsive, two-view dashboard based on the
 current Home Assistant `sections` layout:
 
-- **Overview** — current-month and seven-day totals with per-day averages, a
+- **Overview** — current-month and seven-day totals with matching period-total averages, a
   native 15-minute chart for the latest available 48 hours with an all-history
   weekday/time-band profile, a 30-day daily-usage chart with the matching
   all-history calendar-month daily average, a same-period
@@ -24,9 +24,8 @@ displayed difference reconciles with the two displayed totals.
 
 ### Install
 
-1. Install **ApexCharts Card** and **Energy Custom Graph** from HACS. ApexCharts
-   renders native 15-minute bars and a smooth expected profile; Energy Custom
-   Graph renders the mixed daily bar/calendar-month-average chart.
+1. Install **ApexCharts Card** from HACS. It renders the native 15-minute chart
+   in Wh and the rolling daily chart in kWh, including both smooth profiles.
 2. Open `nord_pool_comparison.yaml` and replace every
    `REPLACE_WITH_CRM_ID` with the CRM ID configured in Alexela.
 3. Create or open a dashboard, choose **Edit dashboard -> Raw configuration

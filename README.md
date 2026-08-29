@@ -41,8 +41,8 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
 - The maintained dashboard example now mirrors the polished two-view
   `sections` dashboard: responsive Overview and Analytics pages, consistent
   month-scoped comparisons, native 15-minute bars for the latest available 48
-  hours (one-day offset), a smooth weekday/time-band profile, per-card daily
-  averages, and a smooth calendar-month daily baseline. The grouped Analytics
+  hours (one-day offset), a smooth weekday/time-band profile, period-total
+  averages on the summary cards, and a smooth calendar-month daily baseline. The grouped Analytics
   page adds recorded-month average/minimum/maximum summaries alongside
   month-over-month, year-over-year, cost, consumption, and Nord Pool graphs.
 
@@ -180,9 +180,11 @@ Two more external statistics support long-term analytics:
   cards. A partially recorded month is explicitly a recorded-month total and
   may remain the minimum until it becomes complete.
 
-The current-month usage, current-month cost, and latest-seven-day cost sensors
-also expose `average_per_day` and `average_per_day_label` attributes for compact
-secondary text in dashboard tiles.
+The current-month usage and cost sensors expose the average of all recorded
+calendar-month totals as `average_period`; the seven-day cost sensor exposes a
+typical seven-day total derived from all imported daily history. Their
+`average_period_label` attributes provide compact secondary text in dashboard
+tiles.
 
 ## Nord Pool comparison
 
