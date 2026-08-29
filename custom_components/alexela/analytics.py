@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, tzinfo
 
 
 def constant_daily_average(
@@ -21,11 +21,11 @@ def typical_hourly_profile(
     hourly_totals: Sequence[tuple[datetime, float]],
     zone: tzinfo,
 ) -> list[tuple[datetime, float]]:
-    """Return the matching weekday/weekend time-of-day average per hour."""
+    """Return the matching day-of-week/time-of-day average per hour."""
     if not hourly_totals:
         return []
 
-    def bucket(start: datetime) -> tuple[bool, str]:
+    def bucket(start: datetime) -> tuple[int, str]:
         local = start.astimezone(zone)
         period = (
             "night"
@@ -36,15 +36,48 @@ def typical_hourly_profile(
             if local.hour < 17
             else "evening"
         )
-        return local.weekday() >= 5, period
+        return local.weekday(), period
 
-    grouped: dict[tuple[bool, str], list[float]] = {}
+    grouped: dict[tuple[int, str], list[float]] = {}
     for start, value in hourly_totals:
         grouped.setdefault(bucket(start), []).append(value)
     averages = {
         key: sum(values) / len(values) for key, values in grouped.items()
     }
     return [(start, averages[bucket(start)]) for start, _ in hourly_totals]
+
+
+def monthly_daily_profile(
+    daily_totals: Sequence[tuple[datetime, float]], zone: tzinfo
+) -> list[tuple[datetime, float]]:
+    """Return the all-history daily average for each calendar month-of-year."""
+    if not daily_totals:
+        return []
+
+    grouped: dict[int, list[float]] = {}
+    for start, value in daily_totals:
+        grouped.setdefault(start.astimezone(zone).month, []).append(value)
+    averages = {
+        month: sum(values) / len(values) for month, values in grouped.items()
+    }
+    return [
+        (start, averages[start.astimezone(zone).month])
+        for start, _ in daily_totals
+    ]
+
+
+def recorded_month_totals(
+    daily_totals: Sequence[tuple[datetime, float]], zone: tzinfo
+) -> list[tuple[datetime, float]]:
+    """Aggregate collected daily values into recorded calendar-month totals."""
+    grouped: dict[tuple[int, int], list[tuple[datetime, float]]] = {}
+    for start, value in daily_totals:
+        local = start.astimezone(zone)
+        grouped.setdefault((local.year, local.month), []).append((start, value))
+    return [
+        (min(start for start, _ in values), sum(value for _, value in values))
+        for _, values in sorted(grouped.items())
+    ]
 
 
 def rolling_import_days(

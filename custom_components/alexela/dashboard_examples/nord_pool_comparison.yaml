@@ -1,7 +1,7 @@
 # Complete responsive Home Assistant dashboard.
 #
 # 1. Replace every REPLACE_WITH_CRM_ID with the CRM ID configured in Alexela.
-# 2. Install "Energy Custom Graph" from HACS for the mixed bar/average chart.
+# 2. Install "ApexCharts Card" and "Energy Custom Graph" from HACS.
 # 3. Paste this complete file into a dashboard's raw configuration editor.
 views:
   - title: Overview
@@ -35,40 +35,36 @@ views:
             heading: Cost
             heading_style: title
             icon: mdi:cash-multiple
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+          - type: tile
+            entity: sensor.alexela_electricity_cost_this_month
             name: This month
             icon: mdi:calendar-month
-            unit: EUR
-            stat_type: change
-            period:
-              calendar:
-                period: month
+            state_content:
+              - state
+              - average_per_day_label
+            vertical: false
             grid_options:
               columns: 6
               rows: 2
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+          - type: tile
+            entity: sensor.alexela_electricity_cost_last_7_available_days
             name: Last 7 days
             icon: mdi:calendar-week
-            unit: EUR
-            stat_type: change
-            period:
-              rolling_window:
-                duration:
-                  days: 7
+            state_content:
+              - state
+              - average_per_day_label
+            vertical: false
             grid_options:
               columns: 6
               rows: 2
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+          - type: tile
+            entity: sensor.alexela_electricity_consumption_this_month
             name: This month
             icon: mdi:meter-electric
-            unit: kWh
-            stat_type: change
-            period:
-              calendar:
-                period: month
+            state_content:
+              - state
+              - average_per_day_label
+            vertical: false
             grid_options:
               columns: 12
               rows: 2
@@ -80,45 +76,62 @@ views:
             heading: Consumption history
             heading_style: title
             icon: mdi:chart-bar
-          - type: custom:energy-custom-graph-card
-            title: Hourly consumption · latest available 48 hours
-            timespan:
-              mode: relative
-              period: day
-              count: 2
-              offset: -2
-            aggregation:
-              manual: hour
+            badges:
+              - type: button
+                icon: mdi:information-outline
+                tap_action:
+                  action: more-info
+                  entity: sensor.alexela_electricity_15_minute_history
+          - type: custom:apexcharts-card
+            graph_span: 48h
+            span:
+              end: day
+              offset: -1d
             header:
-              chip:
-                label: 48 h total
-                unit: kWh
-                precision: 2
-                metric:
-                  source: series
-                  series_id: hourly_usage
-                  reducer: sum
-            y_axes:
-              - id: left
-                unit: kWh
+              show: true
+              title: 15-minute consumption · latest available 48 hours
+              show_states: false
+            apex_config:
+              chart:
+                height: 380
+              tooltip:
+                shared: true
+              yaxis:
                 min: 0
+                title:
+                  text: kWh / 15 min
             series:
-              - id: hourly_usage
-                statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_energy
-                name: Hourly usage
-                stat_type: change
-                chart_type: bar
+              - entity: sensor.alexela_electricity_15_minute_history
+                name: 15-minute usage
+                type: column
                 color: "#f1c40f"
-              - id: typical_hourly_profile
-                statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_typical_hourly_profile_all_history
-                name: Typical usage · weekday/weekend
-                stat_type: mean
-                chart_type: step
-                color: "#8e44ad"
-                line_width: 2
+                data_generator: |
+                  return (entity.attributes.interval_readings || [])
+                    .map((point) => [new Date(point.start).getTime(), point.kwh]);
+              - entity: sensor.alexela_electricity_15_minute_history
+                name: Typical · weekday and time band
+                type: line
+                color: "#3498db"
+                curve: smooth
+                stroke_width: 3
+                extend_to: false
+                data_generator: |
+                  return (entity.attributes.hourly_profile || [])
+                    .map((point) => [new Date(point.start).getTime(), point.kwh]);
             grid_options:
               columns: full
               rows: 7
+          - type: markdown
+            content: >-
+              {% set e = 'sensor.alexela_electricity_15_minute_history' %}
+              **Latest available day:** {{ states(e) | float(0) | round(2) }} kWh
+              · **all-time daily average:**
+              {{ state_attr(e, 'all_time_daily_average_kwh') | float(0) | round(2) }} kWh
+              · **difference:**
+              {{ state_attr(e, 'latest_day_vs_average_kwh') | float(0) | round(2) }} kWh
+            grid_options:
+              columns: full
+              rows: 1
           - type: custom:energy-custom-graph-card
             title: Daily consumption · last 30 days
             timespan:
@@ -136,11 +149,13 @@ views:
                 stat_type: change
                 chart_type: bar
                 color: --energy-grid-consumption-color
-              - statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_daily_average_all_history
-                name: All-time average
+              - statistic_id: alexela:REPLACE_WITH_CRM_ID_electricity_monthly_daily_profile_all_history
+                name: Typical day · calendar month
                 stat_type: mean
                 chart_type: line
-                color: "#8e44ad"
+                color: "#3498db"
+                smooth: true
+                line_width: 3
             grid_options:
               columns: full
               rows: 7
@@ -219,11 +234,273 @@ views:
       - type: grid
         cards:
           - type: heading
-            heading: Daily cost
+            heading: Historical consumption
+            heading_style: title
+            icon: mdi:history
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+            name: This month
+            icon: mdi:calendar-month
+            unit: kWh
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+            name: Previous month
+            icon: mdi:calendar-arrow-left
+            unit: kWh
+            stat_type: change
+            period:
+              calendar:
+                period: month
+                offset: -1
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+            name: This year
+            icon: mdi:calendar
+            unit: kWh
+            stat_type: change
+            period:
+              calendar:
+                period: year
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+            name: Previous year
+            icon: mdi:calendar-arrow-left
+            unit: kWh
+            stat_type: change
+            period:
+              calendar:
+                period: year
+                offset: -1
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_recorded_month_total
+            name: Monthly average
+            icon: mdi:chart-bell-curve
+            unit: kWh
+            stat_type: mean
+            period:
+              fixed_period: {}
+            grid_options:
+              columns: 4
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_recorded_month_total
+            name: Minimum month
+            icon: mdi:arrow-collapse-down
+            unit: kWh
+            stat_type: min
+            period:
+              fixed_period: {}
+            grid_options:
+              columns: 4
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_recorded_month_total
+            name: Maximum month
+            icon: mdi:arrow-expand-up
+            unit: kWh
+            stat_type: max
+            period:
+              fixed_period: {}
+            grid_options:
+              columns: 4
+              rows: 2
+          - type: statistics-graph
+            title: Monthly consumption · 24 months
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+                name: kWh
+                color: "#f1c40f"
+            days_to_show: 730
+            chart_type: bar
+            stat_types:
+              - change
+            period: month
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7
+          - type: statistics-graph
+            title: Annual consumption · 5 years
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+                name: kWh
+                color: "#f39c12"
+            days_to_show: 1825
+            chart_type: bar
+            stat_types:
+              - change
+            period: year
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 6
+          - type: statistics-graph
+            title: Daily consumption · 90 days
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+                name: kWh
+                color: "#f1c40f"
+            days_to_show: 90
+            chart_type: bar
+            stat_types:
+              - change
+            period: day
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7
+          - type: statistics-graph
+            title: Cumulative consumption
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
+                name: kWh
+                color: "#f39c12"
+            days_to_show: 90
+            chart_type: line
+            stat_types:
+              - sum
+            period: day
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 6
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Historical cost
             heading_style: title
             icon: mdi:cash-clock
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+            name: This month
+            icon: mdi:calendar-month
+            unit: EUR
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+            name: Previous month
+            icon: mdi:calendar-arrow-left
+            unit: EUR
+            stat_type: change
+            period:
+              calendar:
+                period: month
+                offset: -1
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+            name: This year
+            icon: mdi:calendar
+            unit: EUR
+            stat_type: change
+            period:
+              calendar:
+                period: year
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: statistic
+            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+            name: Previous year
+            icon: mdi:calendar-arrow-left
+            unit: EUR
+            stat_type: change
+            period:
+              calendar:
+                period: year
+                offset: -1
+            grid_options:
+              columns: 6
+              rows: 2
           - type: statistics-graph
-            title: Fixed cost vs Nord Pool + markup
+            title: Monthly fixed cost · 24 months
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+                name: Fixed cost
+                color: "#e67e22"
+            days_to_show: 730
+            chart_type: bar
+            stat_types:
+              - change
+            period: month
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7
+          - type: statistics-graph
+            title: Annual fixed cost · 5 years
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+                name: Fixed cost
+                color: "#d35400"
+            days_to_show: 1825
+            chart_type: bar
+            stat_types:
+              - change
+            period: year
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 6
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Nord Pool comparison
+            heading_style: title
+            icon: mdi:scale-balance
+          - type: statistics-graph
+            title: Monthly fixed vs Nord Pool + markup
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
+                name: Fixed price
+                color: "#e67e22"
+              - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
+                name: Nord Pool + markup
+                color: "#2980b9"
+            days_to_show: 730
+            chart_type: bar
+            stat_types:
+              - change
+            period: month
+            min_y_axis: 0
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7
+          - type: statistics-graph
+            title: Daily fixed vs Nord Pool + markup
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
                 name: Fixed price
@@ -256,13 +533,6 @@ views:
             grid_options:
               columns: full
               rows: 6
-
-      - type: grid
-        cards:
-          - type: heading
-            heading: Running totals
-            heading_style: title
-            icon: mdi:chart-areaspline
           - type: statistics-graph
             title: Cumulative cost
             entities:
@@ -301,46 +571,7 @@ views:
       - type: grid
         cards:
           - type: heading
-            heading: Usage history
-            heading_style: title
-            icon: mdi:meter-electric
-          - type: statistics-graph
-            title: Daily consumption · 90 days
-            entities:
-              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
-                name: kWh
-                color: "#f1c40f"
-            days_to_show: 90
-            chart_type: bar
-            stat_types:
-              - change
-            period: day
-            min_y_axis: 0
-            fit_y_data: true
-            grid_options:
-              columns: full
-              rows: 7
-          - type: statistics-graph
-            title: Cumulative consumption
-            entities:
-              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
-                name: kWh
-                color: "#f39c12"
-            days_to_show: 90
-            chart_type: line
-            stat_types:
-              - sum
-            period: day
-            min_y_axis: 0
-            fit_y_data: true
-            grid_options:
-              columns: full
-              rows: 6
-
-      - type: grid
-        cards:
-          - type: heading
-            heading: Nord Pool detail
+            heading: Nord Pool prices
             heading_style: title
             icon: mdi:chart-line
           - type: statistics-graph

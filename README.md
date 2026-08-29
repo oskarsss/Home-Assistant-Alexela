@@ -40,10 +40,11 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   are replaced and every affected cumulative total is rebuilt.
 - The maintained dashboard example now mirrors the polished two-view
   `sections` dashboard: responsive Overview and Analytics pages, consistent
-  month-scoped comparisons, the latest available 48 hours of consumption with
-  an all-history weekday/weekend usage profile on the Overview page, daily
-  usage with an all-history daily average, and detailed usage, cost,
-  difference, and Nord Pool graphs.
+  month-scoped comparisons, native 15-minute bars for the latest available 48
+  hours (one-day offset), a smooth weekday/time-band profile, per-card daily
+  averages, and a smooth calendar-month daily baseline. The grouped Analytics
+  page adds recorded-month average/minimum/maximum summaries alongside
+  month-over-month, year-over-year, cost, consumption, and Nord Pool graphs.
 
 ## Installation
 
@@ -160,8 +161,28 @@ Hourly usage charts can use
 `alexela:<CRM ID>_electricity_typical_hourly_profile_all_history`. It divides
 all collected readings into night (00:00–06:00), morning (06:00–10:00),
 daytime (10:00–17:00), and evening (17:00–24:00), with separate averages for
-weekdays and weekends. The matching value is written at every collected hour
-so it renders as a stepped reference profile alongside hourly `change` bars.
+every day of the week. The matching value is written at every collected hour.
+
+The `Electricity 15-minute history` sensor exposes Alexela's native recent
+quarter-hour readings for charts without pretending Home Assistant's hourly
+long-term-statistics store supports quarter-hour rows. Its large chart arrays
+are excluded from Recorder. The same sensor includes a quarter-hour-scaled
+all-history weekday/time-band profile, latest available daily usage, all-time
+daily average, and their difference.
+
+Two more external statistics support long-term analytics:
+
+- `alexela:<CRM ID>_electricity_monthly_daily_profile_all_history` is the
+  average daily usage for the matching calendar month across all imported
+  years (all August days compared with August, and so on).
+- `alexela:<CRM ID>_electricity_recorded_month_total` contains one total for
+  each recorded calendar month, allowing average, minimum, and maximum-month
+  cards. A partially recorded month is explicitly a recorded-month total and
+  may remain the minimum until it becomes complete.
+
+The current-month usage, current-month cost, and latest-seven-day cost sensors
+also expose `average_per_day` and `average_per_day_label` attributes for compact
+secondary text in dashboard tiles.
 
 ## Nord Pool comparison
 

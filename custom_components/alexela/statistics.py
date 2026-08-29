@@ -27,6 +27,8 @@ from homeassistant.util import dt as dt_util
 from .api import AlexelaApi
 from .analytics import (
     constant_daily_average,
+    monthly_daily_profile,
+    recorded_month_totals,
     rolling_import_days,
     typical_hourly_profile,
 )
@@ -66,6 +68,19 @@ REQUEST_DELAY = 1.0
 # Stored in coordinator data for the three user-facing summary sensors. The
 # leading underscore avoids colliding with any Alexela response field.
 NORD_POOL_SUMMARY_KEY = "_nord_pool_summary"
+
+
+def interval_readings(
+    payload: dict[str, Any], zone: tzinfo
+) -> list[tuple[datetime, float]]:
+    """Return Alexela's native interval readings without hourly aggregation."""
+    readings: list[tuple[datetime, float]] = []
+    for row in block_rows(total_block(payload)):
+        timestamp = parse_timestamp(row.get("timestamp"), zone)
+        if timestamp is None:
+            continue
+        readings.append((timestamp.astimezone(dt_util.UTC), float(row["amount"])))
+    return sorted(readings)
 
 
 def hourly_buckets(
@@ -192,6 +207,12 @@ class AlexelaStatisticsImporter:
         self.hourly_profile_id = (
             f"{DOMAIN}:{crm_id}_electricity_typical_hourly_profile_all_history"
         )
+        self.monthly_daily_profile_id = (
+            f"{DOMAIN}:{crm_id}_electricity_monthly_daily_profile_all_history"
+        )
+        self.recorded_month_total_id = (
+            f"{DOMAIN}:{crm_id}_electricity_recorded_month_total"
+        )
         self.nord_pool_price_id = f"{DOMAIN}:{crm_id}_nord_pool_price"
         # v0.3.2 uses new statistic IDs so existing spot-only v0.3.0/v0.3.1
         # history is not silently mixed with the provider-inclusive formula.
@@ -221,6 +242,12 @@ class AlexelaStatisticsImporter:
         last_hourly_profile = await self._async_last_statistic(
             self.hourly_profile_id, "mean"
         )
+        last_monthly_daily_profile = await self._async_last_statistic(
+            self.monthly_daily_profile_id, "mean"
+        )
+        last_recorded_month_total = await self._async_last_statistic(
+            self.recorded_month_total_id, "mean"
+        )
 
         imported_through = (
             last_energy[0].astimezone(zone).date() if last_energy else None
@@ -244,21 +271,39 @@ class AlexelaStatisticsImporter:
         )
         days = await self._async_pending_days(year_payload, zone, oldest_through)
         if not days:
-            if last_daily_average is None or last_hourly_profile is None:
+            if (
+                last_daily_average is None
+                or last_hourly_profile is None
+                or last_monthly_daily_profile is None
+                or last_recorded_month_total is None
+            ):
+                daily_energy = await self._async_daily_energy()
                 if last_daily_average is None:
-                    self._async_write_daily_average(await self._async_daily_energy())
+                    self._async_write_daily_average(daily_energy)
+                if last_monthly_daily_profile is None:
+                    self._async_write_monthly_daily_profile(daily_energy, zone)
+                if last_recorded_month_total is None:
+                    self._async_write_recorded_month_totals(daily_energy, zone)
                 if last_hourly_profile is None:
                     self._async_write_hourly_profile(
                         await self._async_hourly_energy(), zone
                     )
+            daily_energy = await self._async_daily_energy()
+            daily_cost = await self._async_daily_cost()
             return self._comparison_summary(
-                last_nord_pool_cost, last_difference, last_nord_pool_price
+                last_nord_pool_cost,
+                last_difference,
+                last_nord_pool_price,
+                daily_energy=daily_energy,
+                daily_cost=daily_cost,
+                zone=zone,
             )
 
         _LOGGER.debug(
             "Alexela statistics: %s day(s) to import or reconcile", len(days)
         )
         daily_energy = await self._async_daily_energy()
+        daily_cost = await self._async_daily_cost()
         hourly_energy = await self._async_hourly_energy()
         reconcile_start = reference_datetime().date() - timedelta(
             days=RECONCILE_DAYS - 1
@@ -318,6 +363,7 @@ class AlexelaStatisticsImporter:
         nord_pool_price_stats: list[StatisticData] = []
         nord_pool_cost_stats: list[StatisticData] = []
         difference_stats: list[StatisticData] = []
+        recent_intervals: list[tuple[datetime, float]] = []
         comparison_paused = False
 
         for index, day in enumerate(days):
@@ -329,6 +375,7 @@ class AlexelaStatisticsImporter:
                 )
             )
             try:
+                raw_intervals = interval_readings(payload, zone)
                 buckets = hourly_buckets(payload, zone)
             except (KeyError, TypeError, ValueError) as err:
                 _LOGGER.warning(
@@ -350,6 +397,8 @@ class AlexelaStatisticsImporter:
                 )
                 break
 
+            recent_intervals.extend(raw_intervals)
+
             if day in energy_days:
                 daily_energy = [
                     item
@@ -358,6 +407,14 @@ class AlexelaStatisticsImporter:
                 ]
                 daily_energy.append(
                     (buckets[0][0], sum(energy for _, energy, _ in buckets))
+                )
+                daily_cost = [
+                    item
+                    for item in daily_cost
+                    if item[0].astimezone(zone).date() != day
+                ]
+                daily_cost.append(
+                    (buckets[0][0], sum(cost for _, _, cost in buckets))
                 )
                 hourly_energy = [
                     item
@@ -441,11 +498,17 @@ class AlexelaStatisticsImporter:
             )
             self._async_write_daily_average(daily_energy)
             self._async_write_hourly_profile(hourly_energy, zone)
+            self._async_write_monthly_daily_profile(daily_energy, zone)
+            self._async_write_recorded_month_totals(daily_energy, zone)
         else:
             if last_daily_average is None:
                 self._async_write_daily_average(daily_energy)
             if last_hourly_profile is None:
                 self._async_write_hourly_profile(hourly_energy, zone)
+            if last_monthly_daily_profile is None:
+                self._async_write_monthly_daily_profile(daily_energy, zone)
+            if last_recorded_month_total is None:
+                self._async_write_recorded_month_totals(daily_energy, zone)
 
         if nord_pool_cost_stats:
             async_add_external_statistics(
@@ -496,7 +559,34 @@ class AlexelaStatisticsImporter:
             if nord_pool_price_stats
             else last_nord_pool_price
         )
-        return self._comparison_summary(latest_cost, latest_difference, latest_price)
+        profile = typical_hourly_profile(sorted(hourly_energy), zone)
+        newest_interval_day = (
+            max(start.astimezone(zone).date() for start, _ in recent_intervals)
+            if recent_intervals
+            else None
+        )
+        if newest_interval_day is not None:
+            cutoff = newest_interval_day - timedelta(days=2)
+            recent_intervals = [
+                item
+                for item in recent_intervals
+                if item[0].astimezone(zone).date() >= cutoff
+            ]
+            profile = [
+                item
+                for item in profile
+                if item[0].astimezone(zone).date() >= cutoff
+            ]
+        return self._comparison_summary(
+            latest_cost,
+            latest_difference,
+            latest_price,
+            recent_intervals=recent_intervals,
+            hourly_profile=profile,
+            daily_energy=daily_energy,
+            daily_cost=daily_cost,
+            zone=zone,
+        )
 
     def _sum_metadata(
         self, statistic_id: str, name: str, unit: str
@@ -640,6 +730,29 @@ class AlexelaStatisticsImporter:
             hourly.append((timestamp, float(value)))
         return hourly
 
+    async def _async_daily_cost(self) -> list[tuple[datetime, float]]:
+        """Return every daily electricity-cost change already in the recorder."""
+        rows = await get_instance(self.hass).async_add_executor_job(
+            statistics_during_period,
+            self.hass,
+            datetime(1970, 1, 1, tzinfo=dt_util.UTC),
+            None,
+            {self.cost_id},
+            "day",
+            None,
+            {"change"},
+        )
+        daily: list[tuple[datetime, float]] = []
+        for row in rows.get(self.cost_id, []):
+            value = row.get("change")
+            if value is None:
+                continue
+            timestamp = row["start"]
+            if isinstance(timestamp, (int, float)):
+                timestamp = dt_util.utc_from_timestamp(timestamp)
+            daily.append((timestamp, float(value)))
+        return daily
+
     def _async_write_daily_average(
         self, daily_energy: list[tuple[datetime, float]]
     ) -> None:
@@ -670,7 +783,7 @@ class AlexelaStatisticsImporter:
     def _async_write_hourly_profile(
         self, hourly_energy: list[tuple[datetime, float]], zone: tzinfo
     ) -> None:
-        """Publish weekday/weekend averages for each local time-of-day period."""
+        """Publish day-of-week averages for each local time-of-day period."""
         points = typical_hourly_profile(sorted(hourly_energy), zone)
         if not points:
             return
@@ -694,19 +807,123 @@ class AlexelaStatisticsImporter:
             len(points),
         )
 
+    def _async_write_monthly_daily_profile(
+        self, daily_energy: list[tuple[datetime, float]], zone: tzinfo
+    ) -> None:
+        """Publish the matching all-history month-of-year daily average."""
+        points = monthly_daily_profile(sorted(daily_energy), zone)
+        if not points:
+            return
+        stats = [
+            StatisticData(start=start, mean=value, min=value, max=value)
+            for start, value in points
+        ]
+        async_add_external_statistics(
+            self.hass,
+            self._mean_metadata(
+                self.monthly_daily_profile_id,
+                "Alexela daily usage average for calendar month (all history)",
+                UnitOfEnergy.KILO_WATT_HOUR,
+                unit_class="energy",
+            ),
+            stats,
+        )
+
+    def _async_write_recorded_month_totals(
+        self, daily_energy: list[tuple[datetime, float]], zone: tzinfo
+    ) -> None:
+        """Publish one total for every calendar month represented in history."""
+        points = recorded_month_totals(sorted(daily_energy), zone)
+        if not points:
+            return
+        stats = [
+            StatisticData(start=start, mean=value, min=value, max=value)
+            for start, value in points
+        ]
+        async_add_external_statistics(
+            self.hass,
+            self._mean_metadata(
+                self.recorded_month_total_id,
+                "Alexela recorded calendar-month electricity total",
+                UnitOfEnergy.KILO_WATT_HOUR,
+                unit_class="energy",
+            ),
+            stats,
+        )
+
     def _comparison_summary(
         self,
         cost: tuple[datetime, float] | None,
         difference: tuple[datetime, float] | None,
         price: tuple[datetime, float] | None,
+        *,
+        recent_intervals: list[tuple[datetime, float]] | None = None,
+        hourly_profile: list[tuple[datetime, float]] | None = None,
+        daily_energy: list[tuple[datetime, float]] | None = None,
+        daily_cost: list[tuple[datetime, float]] | None = None,
+        zone: tzinfo = dt_util.UTC,
     ) -> dict[str, Any]:
         """Build values shown by the lightweight summary sensors."""
         through = cost[0] if cost else None
+        daily_energy = sorted(daily_energy or [])
+        daily_average = (
+            sum(value for _, value in daily_energy) / len(daily_energy)
+            if daily_energy
+            else None
+        )
+        latest_day = daily_energy[-1] if daily_energy else None
+        daily_cost = sorted(daily_cost or [])
+        latest_month = (
+            (
+                latest_day[0].astimezone(zone).year,
+                latest_day[0].astimezone(zone).month,
+            )
+            if latest_day
+            else None
+        )
+        month_energy = [
+            value
+            for start, value in daily_energy
+            if (start.astimezone(zone).year, start.astimezone(zone).month)
+            == latest_month
+        ]
+        month_cost = [
+            value
+            for start, value in daily_cost
+            if (start.astimezone(zone).year, start.astimezone(zone).month)
+            == latest_month
+        ]
+        last_seven_cost = [value for _, value in daily_cost[-7:]]
         return {
             "reference_cost": cost[1] if cost else None,
             "difference": difference[1] if difference else None,
             "latest_price": price[1] if price else None,
             "data_through": through.isoformat() if through else None,
+            "interval_readings": [
+                {"start": start.isoformat(), "kwh": value}
+                for start, value in (recent_intervals or [])
+            ],
+            "hourly_profile": [
+                # Alexela's bars are quarter-hours; convert the hourly baseline
+                # to the same interval unit before plotting it beside them.
+                {"start": start.isoformat(), "kwh": value / 4}
+                for start, value in (hourly_profile or [])
+            ],
+            "daily_average": daily_average,
+            "latest_day": latest_day[0].isoformat() if latest_day else None,
+            "latest_day_kwh": latest_day[1] if latest_day else None,
+            "month_daily_energy_average": (
+                sum(month_energy) / len(month_energy) if month_energy else None
+            ),
+            "month_daily_cost_average": (
+                sum(month_cost) / len(month_cost) if month_cost else None
+            ),
+            "last_seven_cost": sum(last_seven_cost) if last_seven_cost else None,
+            "last_seven_daily_cost_average": (
+                sum(last_seven_cost) / len(last_seven_cost)
+                if last_seven_cost
+                else None
+            ),
         }
 
     async def _async_pending_days(

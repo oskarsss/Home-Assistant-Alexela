@@ -16,6 +16,8 @@ def _load_analytics_module():
 
 ANALYTICS = _load_analytics_module()
 constant_daily_average = ANALYTICS.constant_daily_average
+monthly_daily_profile = ANALYTICS.monthly_daily_profile
+recorded_month_totals = ANALYTICS.recorded_month_totals
 rolling_import_days = ANALYTICS.rolling_import_days
 typical_hourly_profile = ANALYTICS.typical_hourly_profile
 
@@ -35,11 +37,11 @@ class ConstantDailyAverageTest(unittest.TestCase):
 
 
 class TypicalHourlyProfileTest(unittest.TestCase):
-    def test_splits_time_of_day_and_weekends(self):
+    def test_splits_time_of_day_and_day_of_week(self):
         samples = [
             (datetime(2026, 8, 3, 7, tzinfo=timezone.utc), 0.1),
-            (datetime(2026, 8, 4, 7, tzinfo=timezone.utc), 0.3),
-            (datetime(2026, 8, 8, 7, tzinfo=timezone.utc), 0.8),
+            (datetime(2026, 8, 10, 7, tzinfo=timezone.utc), 0.3),
+            (datetime(2026, 8, 4, 7, tzinfo=timezone.utc), 0.8),
             (datetime(2026, 8, 3, 18, tzinfo=timezone.utc), 0.4),
         ]
 
@@ -54,6 +56,30 @@ class TypicalHourlyProfileTest(unittest.TestCase):
 
     def test_empty_history_has_no_average(self):
         self.assertEqual(typical_hourly_profile([], timezone.utc), [])
+
+
+class MonthlyProfilesTest(unittest.TestCase):
+    def test_daily_profile_matches_calendar_month_across_years(self):
+        samples = [
+            (datetime(2025, 8, 1, tzinfo=timezone.utc), 2.0),
+            (datetime(2026, 8, 1, tzinfo=timezone.utc), 4.0),
+            (datetime(2026, 9, 1, tzinfo=timezone.utc), 9.0),
+        ]
+        self.assertEqual(
+            monthly_daily_profile(samples, timezone.utc),
+            [(samples[0][0], 3.0), (samples[1][0], 3.0), (samples[2][0], 9.0)],
+        )
+
+    def test_recorded_month_totals_group_calendar_months(self):
+        samples = [
+            (datetime(2026, 8, 1, tzinfo=timezone.utc), 2.0),
+            (datetime(2026, 8, 2, tzinfo=timezone.utc), 4.0),
+            (datetime(2026, 9, 1, tzinfo=timezone.utc), 9.0),
+        ]
+        self.assertEqual(
+            recorded_month_totals(samples, timezone.utc),
+            [(samples[0][0], 6.0), (samples[2][0], 9.0)],
+        )
 
 
 class RollingImportDaysTest(unittest.TestCase):

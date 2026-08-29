@@ -122,6 +122,16 @@ def _nord_pool_summary_value(data: dict[str, Any], key: str) -> float | None:
     return float(value) if value is not None else None
 
 
+def _latest_day_energy(data: dict[str, Any]) -> float | None:
+    """Return consumption for Alexela's latest available day."""
+    return _nord_pool_summary_value(data, "latest_day_kwh")
+
+
+def _last_seven_cost(data: dict[str, Any]) -> float | None:
+    """Return the cost of the latest seven available days."""
+    return _nord_pool_summary_value(data, "last_seven_cost")
+
+
 @dataclass(frozen=True, kw_only=True)
 class AlexelaSensorDescription(SensorEntityDescription):
     """Describe an Alexela sensor."""
@@ -175,6 +185,22 @@ SENSORS: tuple[AlexelaSensorDescription, ...] = (
         value_fn=_month_effective_price,
     ),
     AlexelaSensorDescription(
+        key="electricity_cost_last_7_days",
+        name="Electricity cost last 7 available days",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="EUR",
+        suggested_display_precision=2,
+        value_fn=_last_seven_cost,
+    ),
+    AlexelaSensorDescription(
+        key="electricity_15_minute_history",
+        name="Electricity 15-minute history",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
+        value_fn=_latest_day_energy,
+    ),
+    AlexelaSensorDescription(
         key="nord_pool_price_latest",
         name="Latest Nord Pool price incl VAT",
         state_class=SensorStateClass.MEASUREMENT,
@@ -217,6 +243,14 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
     """An Alexela sensor backed by the shared coordinator."""
 
     _attr_has_entity_name = True
+    _unrecorded_attributes = frozenset(
+        {
+            "interval_readings",
+            "hourly_profile",
+            "chart_explanation",
+            "average_basis",
+        }
+    )
 
     def __init__(
         self,
@@ -252,6 +286,59 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
         which data Home Assistant is showing.
         """
         data = self.coordinator.data or {}
+        summary = data.get(NORD_POOL_SUMMARY_KEY)
+        if self.entity_description.key in (
+            "electricity_month",
+            "electricity_cost_month",
+            "electricity_cost_last_7_days",
+        ) and isinstance(summary, dict):
+            if self.entity_description.key == "electricity_month":
+                average = summary.get("month_daily_energy_average")
+                unit = "kWh/day"
+            elif self.entity_description.key == "electricity_cost_month":
+                average = summary.get("month_daily_cost_average")
+                unit = "EUR/day"
+            else:
+                average = summary.get("last_seven_daily_cost_average")
+                unit = "EUR/day"
+            attributes = {
+                "average_per_day": average,
+                "average_per_day_label": (
+                    f"Avg {float(average):.2f} {unit}"
+                    if average is not None
+                    else "Average unavailable"
+                ),
+            }
+            period = _period_start(data)
+            if period is not None:
+                attributes["data_period_start"] = period.isoformat()
+            return attributes
+        if self.entity_description.key == "electricity_15_minute_history":
+            if not isinstance(summary, dict):
+                return None
+            latest = summary.get("latest_day_kwh")
+            average = summary.get("daily_average")
+            difference = (
+                float(latest) - float(average)
+                if latest is not None and average is not None
+                else None
+            )
+            return {
+                "data_through": summary.get("latest_day"),
+                "interval_minutes": 15,
+                "interval_readings": summary.get("interval_readings", []),
+                "hourly_profile": summary.get("hourly_profile", []),
+                "all_time_daily_average_kwh": average,
+                "latest_day_vs_average_kwh": difference,
+                "average_basis": (
+                    "Same weekday and local time band across all imported history"
+                ),
+                "chart_explanation": (
+                    "Bars are Alexela's native 15-minute readings. The smooth "
+                    "line is the all-history average for the matching weekday "
+                    "and time band: night, morning, daytime, or evening."
+                ),
+            }
         if self.entity_description.key in (
             "nord_pool_price_latest",
             "nord_pool_reference_cost",
