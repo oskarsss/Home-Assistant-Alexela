@@ -110,6 +110,8 @@ views:
                 color: "#f1c40f"
                 unit: Wh
                 float_precision: 0
+                show:
+                  legend_value: false
                 data_generator: |
                   return (entity.attributes.interval_readings || [])
                     .map((point) => [new Date(point.start).getTime(), point.kwh * 1000]);
@@ -121,6 +123,8 @@ views:
                 stroke_width: 3
                 unit: Wh
                 float_precision: 0
+                show:
+                  legend_value: false
                 extend_to: false
                 data_generator: |
                   return (entity.attributes.hourly_profile || [])
@@ -154,6 +158,8 @@ views:
                 type: column
                 color: "#64a8d1"
                 float_precision: 2
+                show:
+                  legend_value: false
                 data_generator: |
                   return (entity.attributes.daily_readings || [])
                     .map((point) => [new Date(point.start).getTime(), point.kwh]);
@@ -165,6 +171,8 @@ views:
                 stroke_width: 3
                 float_precision: 2
                 extend_to: false
+                show:
+                  legend_value: false
                 data_generator: |
                   return (entity.attributes.monthly_daily_profile || [])
                     .map((point) => [new Date(point.start).getTime(), point.kwh]);
