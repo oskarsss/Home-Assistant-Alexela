@@ -15,6 +15,7 @@ def _load_analytics_module():
 
 
 ANALYTICS = _load_analytics_module()
+align_hourly_profile_to_intervals = ANALYTICS.align_hourly_profile_to_intervals
 constant_daily_average = ANALYTICS.constant_daily_average
 monthly_daily_profile = ANALYTICS.monthly_daily_profile
 recorded_month_totals = ANALYTICS.recorded_month_totals
@@ -79,6 +80,17 @@ class MonthlyProfilesTest(unittest.TestCase):
         self.assertEqual(
             recorded_month_totals(samples, timezone.utc),
             [(samples[0][0], 6.0), (samples[2][0], 9.0)],
+        )
+
+
+class AlignHourlyProfileTest(unittest.TestCase):
+    def test_repeats_hour_value_at_every_quarter_hour(self):
+        hour = datetime(2026, 8, 28, 3, tzinfo=timezone.utc)
+        intervals = [hour + timedelta(minutes=minutes) for minutes in (0, 15, 30, 45)]
+
+        self.assertEqual(
+            align_hourly_profile_to_intervals(intervals, [(hour, 0.2)]),
+            [(start, 0.2) for start in intervals],
         )
 
 

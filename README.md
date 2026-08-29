@@ -167,7 +167,8 @@ The `Electricity 15-minute history` sensor exposes Alexela's native recent
 quarter-hour readings for charts without pretending Home Assistant's hourly
 long-term-statistics store supports quarter-hour rows. Its large chart arrays
 are excluded from Recorder. The same sensor includes a quarter-hour-scaled
-all-history weekday/time-band profile, latest available daily usage, all-time
+all-history weekday/time-band profile repeated at every quarter-hour timestamp
+so both values appear together in chart tooltips, latest available daily usage, all-time
 daily average, and their difference.
 
 Two more external statistics support long-term analytics:

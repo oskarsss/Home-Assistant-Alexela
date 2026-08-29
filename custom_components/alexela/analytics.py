@@ -80,6 +80,20 @@ def recorded_month_totals(
     ]
 
 
+def align_hourly_profile_to_intervals(
+    interval_starts: Sequence[datetime],
+    hourly_profile: Sequence[tuple[datetime, float]],
+) -> list[tuple[datetime, float]]:
+    """Repeat each hourly profile value at matching interval timestamps."""
+    by_hour = {start: value for start, value in hourly_profile}
+    aligned: list[tuple[datetime, float]] = []
+    for start in interval_starts:
+        hour = start.replace(minute=0, second=0, microsecond=0)
+        if hour in by_hour:
+            aligned.append((start, by_hour[hour]))
+    return aligned
+
+
 def rolling_import_days(
     published: list[date],
     newest: date,

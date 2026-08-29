@@ -36,28 +36,32 @@ views:
             heading_style: title
             icon: mdi:cash-multiple
           - type: tile
+            grid_options:
+              rows: auto
             entity: sensor.alexela_electricity_cost_this_month
             name: This month
             icon: mdi:calendar-month
             state_content:
               - state
               - average_period_label
-            vertical: false
+            vertical: true
+            features_position: bottom
+          - type: tile
             grid_options:
               columns: 6
-              rows: 2
-          - type: tile
+              rows: auto
             entity: sensor.alexela_electricity_cost_last_7_available_days
             name: Last 7 days
             icon: mdi:calendar-week
             state_content:
               - state
               - average_period_label
-            vertical: false
-            grid_options:
-              columns: 6
-              rows: 2
+            vertical: true
+            features_position: bottom
           - type: tile
+            grid_options:
+              columns: full
+              rows: auto
             entity: sensor.alexela_electricity_consumption_this_month
             name: This month
             icon: mdi:meter-electric
@@ -65,9 +69,7 @@ views:
               - state
               - average_period_label
             vertical: false
-            grid_options:
-              columns: 12
-              rows: 2
+            features_position: bottom
 
       - type: grid
         column_span: 2

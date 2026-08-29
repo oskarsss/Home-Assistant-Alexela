@@ -26,6 +26,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import AlexelaApi
 from .analytics import (
+    align_hourly_profile_to_intervals,
     constant_daily_average,
     monthly_daily_profile,
     recorded_month_totals,
@@ -578,6 +579,9 @@ class AlexelaStatisticsImporter:
                 for item in profile
                 if item[0].astimezone(zone).date() >= cutoff
             ]
+            profile = align_hourly_profile_to_intervals(
+                [start for start, _ in recent_intervals], profile
+            )
         return self._comparison_summary(
             latest_cost,
             latest_difference,
