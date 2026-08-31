@@ -201,6 +201,10 @@ creates these external long-term statistics:
 
 - `alexela:<CRM ID>_nord_pool_price` — the hourly average Nord Pool price,
   converted from `EUR/MWh` to `EUR/kWh` and including 21% Latvian VAT.
+- `alexela:<CRM ID>_electricity_daily_effective_price` — Alexela's daily
+  consumption-weighted effective price per kWh.
+- `alexela:<CRM ID>_nord_pool_provider_daily_reference_price` — the daily
+  consumption-weighted Nord Pool price including VAT and provider markup.
 - `alexela:<CRM ID>_nord_pool_provider_reference_cost` — what the metered
   consumption would have cost at the VAT-inclusive spot price plus the
   provider's VAT-inclusive `0.0087 EUR/kWh` markup.
@@ -217,6 +221,11 @@ of interval history, so a new installation starts there; Home Assistant keeps
 those statistics indefinitely and the comparison history grows from then on.
 Use the external statistics in a Statistics Graph card to view and total a
 specific day, month or year covered by the imported history.
+
+The two daily price statistics are the supported source for a fixed-price vs
+Nord-Pool-plus-markup price chart. They are imported and reconciled by this
+integration; do not use installation-local `alexela_price:*` statistics for
+that chart because the integration cannot advance or repair those series.
 
 Nord Pool groups prices by the CET/CEST delivery date. Because Latvia is one
 hour ahead, the integration combines the requested and previous Nord Pool

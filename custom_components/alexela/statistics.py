@@ -43,6 +43,7 @@ from .const import (
 from .nordpool import (
     NordPoolApi,
     NordPoolError,
+    effective_price_eur_per_kwh,
     price_intervals,
     reference_price_eur_per_kwh,
     spot_price_eur_per_kwh,
@@ -216,6 +217,12 @@ class AlexelaStatisticsImporter:
             f"{DOMAIN}:{crm_id}_electricity_recorded_month_total"
         )
         self.nord_pool_price_id = f"{DOMAIN}:{crm_id}_nord_pool_price"
+        self.daily_effective_price_id = (
+            f"{DOMAIN}:{crm_id}_electricity_daily_effective_price"
+        )
+        self.daily_reference_price_id = (
+            f"{DOMAIN}:{crm_id}_nord_pool_provider_daily_reference_price"
+        )
         # v0.3.2 uses new statistic IDs so existing spot-only v0.3.0/v0.3.1
         # history is not silently mixed with the provider-inclusive formula.
         # Home Assistant then backfills these new series from their own cursor.
@@ -238,6 +245,12 @@ class AlexelaStatisticsImporter:
         last_nord_pool_price = await self._async_last_statistic(
             self.nord_pool_price_id, "mean"
         )
+        last_daily_effective_price = await self._async_last_statistic(
+            self.daily_effective_price_id, "mean"
+        )
+        last_daily_reference_price = await self._async_last_statistic(
+            self.daily_reference_price_id, "mean"
+        )
         last_daily_average = await self._async_last_statistic(
             self.daily_average_id, "mean"
         )
@@ -254,17 +267,25 @@ class AlexelaStatisticsImporter:
         imported_through = (
             last_energy[0].astimezone(zone).date() if last_energy else None
         )
-        comparison_through = (
-            last_nord_pool_cost[0].astimezone(zone).date()
-            if last_nord_pool_cost
-            else None
-        )
         # Nord Pool's unauthenticated portal does not provide a full year of
         # interval history. On first run, begin at the oldest date safely
         # available there rather than repeatedly failing on January.
-        comparison_cursor = comparison_through or (
-            reference_datetime().date()
-            - timedelta(days=NORD_POOL_INITIAL_BACKFILL_DAYS + 1)
+        initial_comparison_cursor = reference_datetime().date() - timedelta(
+            days=NORD_POOL_INITIAL_BACKFILL_DAYS + 1
+        )
+        comparison_cursors = [
+            cursor[0].astimezone(zone).date()
+            for cursor in (
+                last_nord_pool_cost,
+                last_daily_effective_price,
+                last_daily_reference_price,
+            )
+            if cursor is not None
+        ]
+        comparison_cursor = (
+            min(comparison_cursors)
+            if len(comparison_cursors) == 3
+            else initial_comparison_cursor
         )
         oldest_through = (
             min(imported_through, comparison_cursor)
@@ -365,6 +386,8 @@ class AlexelaStatisticsImporter:
         nord_pool_price_stats: list[StatisticData] = []
         nord_pool_cost_stats: list[StatisticData] = []
         difference_stats: list[StatisticData] = []
+        daily_effective_price_stats: list[StatisticData] = []
+        daily_reference_price_stats: list[StatisticData] = []
         recent_intervals: list[tuple[datetime, float]] = []
         comparison_paused = False
 
@@ -449,6 +472,36 @@ class AlexelaStatisticsImporter:
                         err,
                     )
                 else:
+                    day_energy = sum(energy for _, energy, _ in buckets)
+                    day_cost = sum(cost for _, _, cost in buckets)
+                    day_reference_cost = sum(
+                        reference_cost
+                        for _, _, reference_cost, _ in comparison_buckets
+                    )
+                    if day_energy > 0:
+                        effective_price = effective_price_eur_per_kwh(
+                            day_cost, day_energy
+                        )
+                        reference_price = effective_price_eur_per_kwh(
+                            day_reference_cost, day_energy
+                        )
+                        day_start = buckets[0][0]
+                        daily_effective_price_stats.append(
+                            StatisticData(
+                                start=day_start,
+                                mean=effective_price,
+                                min=effective_price,
+                                max=effective_price,
+                            )
+                        )
+                        daily_reference_price_stats.append(
+                            StatisticData(
+                                start=day_start,
+                                mean=reference_price,
+                                min=reference_price,
+                                max=reference_price,
+                            )
+                        )
                     for hour, price, reference_cost, difference in comparison_buckets:
                         nord_pool_cost_sum += reference_cost
                         difference_sum += difference
@@ -540,6 +593,26 @@ class AlexelaStatisticsImporter:
                 ),
                 difference_stats,
             )
+            if daily_effective_price_stats:
+                async_add_external_statistics(
+                    self.hass,
+                    self._mean_metadata(
+                        self.daily_effective_price_id,
+                        "Alexela daily effective electricity price",
+                        "EUR/kWh",
+                    ),
+                    daily_effective_price_stats,
+                )
+            if daily_reference_price_stats:
+                async_add_external_statistics(
+                    self.hass,
+                    self._mean_metadata(
+                        self.daily_reference_price_id,
+                        "Nord Pool plus provider markup daily reference price",
+                        "EUR/kWh",
+                    ),
+                    daily_reference_price_stats,
+                )
             _LOGGER.debug(
                 "Alexela statistics: imported %s Nord Pool comparison hour(s) up to %s",
                 len(nord_pool_cost_stats),

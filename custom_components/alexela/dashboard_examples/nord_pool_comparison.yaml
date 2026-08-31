@@ -601,6 +601,24 @@ views:
             heading_style: title
             icon: mdi:chart-line
           - type: statistics-graph
+            title: Fixed price vs Nord Pool + markup
+            entities:
+              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_daily_effective_price
+                name: Fixed price
+                color: "#e67e22"
+              - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_daily_reference_price
+                name: Nord Pool + markup
+                color: "#2980b9"
+            days_to_show: 31
+            chart_type: line
+            stat_types:
+              - mean
+            period: day
+            fit_y_data: true
+            grid_options:
+              columns: full
+              rows: 7
+          - type: statistics-graph
             title: Matched price range by day
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_price

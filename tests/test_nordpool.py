@@ -151,6 +151,16 @@ class ReferencePriceTest(unittest.TestCase):
             0.1297,
         )
 
+    def test_calculates_consumption_weighted_effective_price(self):
+        self.assertAlmostEqual(
+            NORDPOOL.effective_price_eur_per_kwh(1.25, 10.0),
+            0.125,
+        )
+
+    def test_rejects_effective_price_without_consumption(self):
+        with self.assertRaises(ValueError):
+            NORDPOOL.effective_price_eur_per_kwh(0.0, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

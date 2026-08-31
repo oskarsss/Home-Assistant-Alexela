@@ -114,6 +114,13 @@ def reference_price_eur_per_kwh(eur_per_mwh: float) -> float:
     return spot_price_eur_per_kwh(eur_per_mwh) + PROVIDER_MARKUP_EUR_PER_KWH
 
 
+def effective_price_eur_per_kwh(cost: float, energy: float) -> float:
+    """Return the consumption-weighted unit price for a period."""
+    if energy <= 0:
+        raise ValueError("Energy must be positive when calculating a unit price")
+    return cost / energy
+
+
 def price_intervals(payload: dict[str, Any]) -> list[NordPoolPriceInterval]:
     """Parse usable Latvia delivery intervals from a Data Portal response."""
     intervals: list[NordPoolPriceInterval] = []
