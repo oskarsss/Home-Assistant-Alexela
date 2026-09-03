@@ -392,15 +392,19 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
             if not isinstance(summary, dict):
                 return None
             if self.entity_description.key == "electricity_recorded_month_average":
-                count = int(summary.get("recorded_month_count") or 0)
+                count = int(summary.get("completed_month_count") or 0)
                 return {
                     "month_label": (
-                        f"Across {count} recorded month"
+                        f"Across {count} completed month"
                         f"{'s' if count != 1 else ''}"
                     ),
                     "months": summary.get("months_chronological", []),
                     "ranking_order": "newest first",
-                    "recorded_month_count": count,
+                    "recorded_month_count": int(
+                        summary.get("recorded_month_count") or 0
+                    ),
+                    "completed_month_count": count,
+                    "data_note": "Incomplete calendar months are excluded",
                 }
             is_minimum = (
                 self.entity_description.key == "electricity_recorded_month_minimum"

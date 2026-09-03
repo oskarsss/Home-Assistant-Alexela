@@ -83,9 +83,13 @@ def recorded_month_totals(
 
 
 def recorded_month_records(
-    daily_totals: Sequence[tuple[datetime, float]], zone: tzinfo
+    daily_totals: Sequence[tuple[datetime, float]],
+    zone: tzinfo,
+    *,
+    today: date | None = None,
 ) -> list[dict[str, Any]]:
-    """Return labelled month totals and whether every calendar day exists."""
+    """Return month totals and whether each past calendar month is complete."""
+    current_month = today or datetime.now(zone).date()
     records: list[dict[str, Any]] = []
     for start, value in recorded_month_totals(daily_totals, zone):
         local = start.astimezone(zone)
@@ -98,16 +102,58 @@ def recorded_month_records(
             )
             == (local.year, local.month)
         }
+        days_in_month = calendar.monthrange(local.year, local.month)[1]
+        is_past_month = (local.year, local.month) < (
+            current_month.year,
+            current_month.month,
+        )
         records.append(
             {
                 "month": local.strftime("%B %Y"),
                 "start": start.isoformat(),
                 "kwh": value,
-                "complete": len(days)
-                == calendar.monthrange(local.year, local.month)[1],
+                "complete": len(days) == days_in_month and is_past_month,
             }
         )
     return records
+
+
+def completed_month_average(
+    daily_totals: Sequence[tuple[datetime, float]],
+    zone: tzinfo,
+    *,
+    today: date | None = None,
+) -> float | None:
+    """Return the average total across past, fully recorded calendar months."""
+    totals = [
+        record["kwh"]
+        for record in recorded_month_records(daily_totals, zone, today=today)
+        if record["complete"]
+    ]
+    return sum(totals) / len(totals) if totals else None
+
+
+def completed_week_average(
+    daily_totals: Sequence[tuple[datetime, float]],
+    zone: tzinfo,
+    *,
+    today: date | None = None,
+) -> float | None:
+    """Return the average total across past, complete Monday-Sunday weeks."""
+    current_day = today or datetime.now(zone).date()
+    grouped: dict[date, list[tuple[date, float]]] = {}
+    for start, value in daily_totals:
+        local_day = start.astimezone(zone).date()
+        week_start = local_day - timedelta(days=local_day.weekday())
+        grouped.setdefault(week_start, []).append((local_day, value))
+
+    totals = [
+        sum(value for _, value in values)
+        for week_start, values in grouped.items()
+        if week_start + timedelta(days=7) <= current_day
+        and len({local_day for local_day, _ in values}) == 7
+    ]
+    return sum(totals) / len(totals) if totals else None
 
 
 def align_hourly_profile_to_intervals(

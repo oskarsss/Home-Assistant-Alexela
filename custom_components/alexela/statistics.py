@@ -27,6 +27,8 @@ from homeassistant.util import dt as dt_util
 from .api import AlexelaApi
 from .analytics import (
     align_hourly_profile_to_intervals,
+    completed_month_average,
+    completed_week_average,
     constant_daily_average,
     monthly_daily_profile,
     recorded_month_records,
@@ -976,13 +978,6 @@ class AlexelaStatisticsImporter:
             == latest_month
         ]
         last_seven_cost = [value for _, value in daily_cost[-7:]]
-        energy_month_totals = recorded_month_totals(daily_energy, zone)
-        cost_month_totals = recorded_month_totals(daily_cost, zone)
-        all_time_daily_cost_average = (
-            sum(value for _, value in daily_cost) / len(daily_cost)
-            if daily_cost
-            else None
-        )
         month_records = recorded_month_records(daily_energy, zone)
         complete_month_records = [
             item for item in month_records if item["complete"]
@@ -1035,10 +1030,7 @@ class AlexelaStatisticsImporter:
                 else None
             ),
             "recorded_month_energy_average": (
-                sum(value for _, value in energy_month_totals)
-                / len(energy_month_totals)
-                if energy_month_totals
-                else None
+                completed_month_average(daily_energy, zone)
             ),
             "minimum_recorded_month_kwh": (
                 minimum_month["kwh"] if minimum_month else None
@@ -1064,15 +1056,10 @@ class AlexelaStatisticsImporter:
             "recorded_month_count": len(month_records),
             "completed_month_count": len(complete_month_records),
             "recorded_month_cost_average": (
-                sum(value for _, value in cost_month_totals)
-                / len(cost_month_totals)
-                if cost_month_totals
-                else None
+                completed_month_average(daily_cost, zone)
             ),
             "typical_seven_day_cost": (
-                all_time_daily_cost_average * 7
-                if all_time_daily_cost_average is not None
-                else None
+                completed_week_average(daily_cost, zone)
             ),
         }
 

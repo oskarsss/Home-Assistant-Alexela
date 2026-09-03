@@ -16,6 +16,8 @@ def _load_analytics_module():
 
 ANALYTICS = _load_analytics_module()
 align_hourly_profile_to_intervals = ANALYTICS.align_hourly_profile_to_intervals
+completed_month_average = ANALYTICS.completed_month_average
+completed_week_average = ANALYTICS.completed_week_average
 constant_daily_average = ANALYTICS.constant_daily_average
 monthly_daily_profile = ANALYTICS.monthly_daily_profile
 recorded_month_totals = ANALYTICS.recorded_month_totals
@@ -94,13 +96,113 @@ class MonthlyProfilesTest(unittest.TestCase):
         ]
 
         records = recorded_month_records(
-            january + partial_february, timezone.utc
+            january + partial_february,
+            timezone.utc,
+            today=date(2026, 3, 1),
         )
 
         self.assertEqual(records[0]["month"], "January 2026")
         self.assertTrue(records[0]["complete"])
         self.assertEqual(records[1]["month"], "February 2026")
         self.assertFalse(records[1]["complete"])
+
+    def test_monthly_average_excludes_partial_months(self):
+        january = [
+            (datetime(2026, 1, day, tzinfo=timezone.utc), 1.0)
+            for day in range(1, 32)
+        ]
+        partial_february = [
+            (datetime(2026, 2, day, tzinfo=timezone.utc), 10.0)
+            for day in range(1, 4)
+        ]
+
+        self.assertEqual(
+            completed_month_average(
+                january + partial_february,
+                timezone.utc,
+                today=date(2026, 3, 1),
+            ),
+            31.0,
+        )
+
+    def test_monthly_average_requires_a_completed_month(self):
+        partial = [(datetime(2026, 2, 1, tzinfo=timezone.utc), 10.0)]
+
+        self.assertIsNone(
+            completed_month_average(
+                partial, timezone.utc, today=date(2026, 3, 1)
+            )
+        )
+
+    def test_monthly_average_always_excludes_current_month(self):
+        full_current_month = [
+            (datetime(2026, 2, day, tzinfo=timezone.utc), 1.0)
+            for day in range(1, 29)
+        ]
+
+        self.assertIsNone(
+            completed_month_average(
+                full_current_month,
+                timezone.utc,
+                today=date(2026, 2, 28),
+            )
+        )
+
+
+class CompletedWeekAverageTest(unittest.TestCase):
+    def test_uses_only_full_monday_to_sunday_weeks(self):
+        partial_leading_week = [
+            (datetime(2026, 1, day, tzinfo=timezone.utc), 100.0)
+            for day in range(1, 5)
+        ]
+        first_full_week = [
+            (datetime(2026, 1, day, tzinfo=timezone.utc), 1.0)
+            for day in range(5, 12)
+        ]
+        second_full_week = [
+            (datetime(2026, 1, day, tzinfo=timezone.utc), 3.0)
+            for day in range(12, 19)
+        ]
+        partial_trailing_week = [
+            (datetime(2026, 1, day, tzinfo=timezone.utc), 100.0)
+            for day in range(19, 22)
+        ]
+
+        self.assertEqual(
+            completed_week_average(
+                partial_leading_week
+                + first_full_week
+                + second_full_week
+                + partial_trailing_week,
+                timezone.utc,
+                today=date(2026, 1, 22),
+            ),
+            14.0,
+        )
+
+    def test_requires_a_full_week(self):
+        partial = [
+            (datetime(2026, 1, day, tzinfo=timezone.utc), 1.0)
+            for day in range(5, 11)
+        ]
+
+        self.assertIsNone(
+            completed_week_average(
+                partial, timezone.utc, today=date(2026, 1, 12)
+            )
+        )
+
+    def test_excludes_the_current_week(self):
+        current_week = [
+            (datetime(2026, 1, day, tzinfo=timezone.utc), 1.0)
+            for day in range(5, 12)
+        ]
+
+        self.assertIsNone(
+            completed_week_average(
+                current_week, timezone.utc, today=date(2026, 1, 11)
+            )
+        )
 
 
 class AlignHourlyProfileTest(unittest.TestCase):

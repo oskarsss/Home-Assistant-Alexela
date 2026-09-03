@@ -179,17 +179,17 @@ Two more external statistics support long-term analytics:
 - `alexela:<CRM ID>_electricity_recorded_month_total` contains one total for
   each recorded calendar month. The integration also exposes monthly-average,
   minimum-month, and maximum-month sensors with month/year labels and ranked
-  month lists for dashboard drill-downs. Minimum and maximum rankings exclude
-  incomplete calendar months, so an in-progress month cannot become a false
-  record.
+  month lists for dashboard drill-downs. The overall average and the minimum
+  and maximum rankings exclude incomplete calendar months, so an in-progress
+  month cannot distort the result or become a false record.
 
 In the example dashboard, pressing Monthly average opens all recorded months
 newest-first. Pressing Minimum month opens completed months from lowest to
 highest; pressing Maximum month opens them from highest to lowest.
 
-The current-month usage and cost sensors expose the average of all recorded
-calendar-month totals as `average_period`; the seven-day cost sensor exposes a
-typical seven-day total derived from all imported daily history. Their
+The current-month usage and cost sensors expose the average of completed
+calendar-month totals as `average_period`; the seven-day cost sensor exposes
+the average total of fully recorded Monday-Sunday weeks. Their
 `average_period_label` attributes provide compact secondary text in dashboard
 tiles.
 
