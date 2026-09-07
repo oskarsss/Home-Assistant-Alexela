@@ -54,12 +54,16 @@ days before the payment deadline, and on becoming overdue and every seven days
 thereafter. If polling misses the five-day boundary, the reminder is sent on
 the next successful poll before the deadline. Discovering an already-overdue
 bill starts its weekly reminder clock immediately, without a duplicate alert.
-Reminder history survives Home Assistant restarts. Paid bills are dismissed
+Reminder history survives Home Assistant restarts. Startup discovery waits
+until Home Assistant is running so forwarding automations can receive it. Paid bills are dismissed
 after a successful refresh. Existing persistent-notification forwarding can
 deliver these alerts to mobile devices; dismissing the HA alert does not itself
 clear previously forwarded mobile copies.
 
-The complete dashboard example includes a bills card. For an existing dashboard,
+The complete dashboard example includes an Unpaid bills category above Cost.
+Its heading and details disappear when the unpaid bill count becomes zero
+after a successful refresh (normally within 15 minutes). Unknown data also
+hides the category; hidden does not prove payment if the API is unavailable. For an existing dashboard,
 add [this native card](custom_components/alexela/dashboard_examples/unpaid_bills_card.yaml).
 Existing dashboards are not automatically overwritten by integration updates.
 Entity IDs may differ if you have renamed entities or HA added a suffix.

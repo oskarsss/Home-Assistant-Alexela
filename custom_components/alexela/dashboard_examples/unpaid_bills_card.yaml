@@ -1,8 +1,18 @@
-# Native card; check entity IDs if your installation has renamed sensors.
-type: markdown
-title: Electricity bills
-entity_id:
-  - sensor.alexela_electricity_unpaid_bills
-content: >-
-  {{ state_attr('sensor.alexela_electricity_unpaid_bills', 'message')
-     or 'Bill information unavailable. Update Alexela to v0.3.12 or later and check the integration.' }}
+# Add above Cost. The entire category disappears when no bills remain unpaid.
+type: conditional
+conditions:
+  - condition: numeric_state
+    entity: sensor.alexela_electricity_unpaid_bills
+    above: 0
+card:
+  type: vertical-stack
+  cards:
+    - type: heading
+      heading: Unpaid bills
+      heading_style: title
+      icon: mdi:invoice-text-clock-outline
+    - type: markdown
+      entity_id:
+        - sensor.alexela_electricity_unpaid_bills
+      content: >-
+        {{ state_attr('sensor.alexela_electricity_unpaid_bills', 'message') or '' }}

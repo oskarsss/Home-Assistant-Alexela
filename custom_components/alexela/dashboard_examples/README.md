@@ -48,4 +48,6 @@ editor and adjust locally renamed sensor entity IDs if necessary.
 
 `unpaid_bills_card.yaml` displays unpaid amounts and payment deadlines using the
 new billing sensors in v0.3.12. The complete dashboard includes this card too.
-The unavailable message remains visible until the updated integration is loaded.
+From v0.3.13, the Unpaid bills category appears above Cost only when the
+unpaid count is positive. Both its heading and details disappear at zero
+(or when billing data is unknown).

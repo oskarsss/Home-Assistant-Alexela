@@ -22,7 +22,7 @@ class InvoiceTests(unittest.TestCase):
         self.assertEqual(result["unpaid_amount"], 21.42)
         self.assertEqual(result["next_due_date"], "2026-09-20")
         self.assertEqual(result["overdue_count"], 0)
-        self.assertIn("due 2026-09-20", result["message"])
+        self.assertIn("due **2026-09-20**", result["message"])
 
     def test_partial_paid_credit_and_due_today(self):
         result = invoices.summarize_invoices([
@@ -51,7 +51,7 @@ class InvoiceTests(unittest.TestCase):
         ], TODAY)
         self.assertEqual(result["unpaid_count"], 2)
         self.assertEqual(result["next_due_date"], "2026-09-10")
-        self.assertIn("due unknown", result["message"])
+        self.assertIn("due **unknown**", result["message"])
 
 
 class ReminderTests(unittest.TestCase):

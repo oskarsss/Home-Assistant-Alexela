@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import aiohttp_client
@@ -43,6 +44,7 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_valid: dict[str, Any] | None = None
         self._invoice_store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.invoice_reminders")
         self._invoice_history: dict[str, Any] | None = None
+        self._invoice_startup_pending = False
         self.statistics = AlexelaStatisticsImporter(
             hass,
             self.api,
@@ -82,6 +84,24 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_invoice_reminders(
         self, summary: dict[str, Any], today: date
     ) -> None:
+        # First refresh runs during setup, before notification-forwarding
+        # automations are listening. Do not mark discovery delivered yet.
+        if not self.hass.is_running:
+            if not self._invoice_startup_pending:
+                self._invoice_startup_pending = True
+
+                async def send_after_start(_event) -> None:
+                    self._invoice_startup_pending = False
+                    latest = (self.data or {}).get(INVOICE_SUMMARY_KEY)
+                    if latest is not None:
+                        await self._async_invoice_reminders(
+                            latest, datetime.now(ZoneInfo(PORTAL_TIME_ZONE)).date()
+                        )
+
+                self.entry.async_on_unload(self.hass.bus.async_listen_once(
+                    EVENT_HOMEASSISTANT_STARTED, send_after_start
+                ))
+            return
         if self._invoice_history is None:
             self._invoice_history = await self._invoice_store.async_load() or {}
         actions, history = plan_reminders(summary, self._invoice_history, today)

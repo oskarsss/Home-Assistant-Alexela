@@ -32,18 +32,28 @@ views:
       - type: grid
         cards:
           - type: heading
-            heading: Cost
+            heading: Unpaid bills
             heading_style: title
-            icon: mdi:cash-multiple
+            icon: mdi:invoice-text-clock-outline
+            visibility:
+              - condition: numeric_state
+                entity: sensor.alexela_electricity_unpaid_bills
+                above: 0
           - type: markdown
-            title: Electricity bills
             grid_options:
               columns: full
+            visibility:
+              - condition: numeric_state
+                entity: sensor.alexela_electricity_unpaid_bills
+                above: 0
             entity_id:
               - sensor.alexela_electricity_unpaid_bills
             content: >-
-              {{ state_attr('sensor.alexela_electricity_unpaid_bills', 'message')
-                 or 'Bill information unavailable. Update Alexela to v0.3.12 or later and check the integration.' }}
+              {{ state_attr('sensor.alexela_electricity_unpaid_bills', 'message') or '' }}
+          - type: heading
+            heading: Cost
+            heading_style: title
+            icon: mdi:cash-multiple
           - type: tile
             grid_options:
               rows: auto

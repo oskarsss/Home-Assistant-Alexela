@@ -44,11 +44,11 @@ def summarize_invoices(items: list[dict[str, Any]], today: date) -> dict[str, An
     unpaid.sort(key=lambda item: (item["due_date"] or "9999-12-31", item["number"]))
     deadlines = [item["due_date"] for item in unpaid if item["due_date"]]
     if unpaid:
-        lines = [f"{len(unpaid)} unpaid bill(s): EUR {total:.2f} outstanding."]
+        lines = [f"{len(unpaid)} unpaid bill(s): **EUR {total:.2f}** outstanding."]
         for item in unpaid:
             deadline = item["due_date"] or "unknown"
             label = "OVERDUE" if item["overdue"] else "due"
-            lines.append(f"Bill {item['number']}: EUR {item['unpaid']:.2f}, {label} {deadline}.")
+            lines.append(f"Bill {item['number']}: **EUR {item['unpaid']:.2f}**, {label} **{deadline}**.")
         message = "\n\n".join(lines)
     else:
         message = "No unpaid electricity bills."
