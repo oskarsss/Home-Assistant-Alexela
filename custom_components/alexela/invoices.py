@@ -44,7 +44,10 @@ def summarize_invoices(items: list[dict[str, Any]], today: date) -> dict[str, An
     unpaid.sort(key=lambda item: (item["due_date"] or "9999-12-31", item["number"]))
     deadlines = [item["due_date"] for item in unpaid if item["due_date"]]
     if unpaid:
-        lines = [f"{len(unpaid)} unpaid bill(s): **EUR {total:.2f}** outstanding."]
+        lines = (
+            [f"{len(unpaid)} unpaid bills: **EUR {total:.2f}** outstanding."]
+            if len(unpaid) > 1 else []
+        )
         for item in unpaid:
             deadline = item["due_date"] or "unknown"
             label = "OVERDUE" if item["overdue"] else "due"

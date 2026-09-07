@@ -23,6 +23,7 @@ class InvoiceTests(unittest.TestCase):
         self.assertEqual(result["next_due_date"], "2026-09-20")
         self.assertEqual(result["overdue_count"], 0)
         self.assertIn("due **2026-09-20**", result["message"])
+        self.assertEqual(result["message"].count("21.42"), 1)
 
     def test_partial_paid_credit_and_due_today(self):
         result = invoices.summarize_invoices([
