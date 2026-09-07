@@ -35,6 +35,15 @@ views:
             heading: Cost
             heading_style: title
             icon: mdi:cash-multiple
+          - type: markdown
+            title: Electricity bills
+            grid_options:
+              columns: full
+            entity_id:
+              - sensor.alexela_electricity_unpaid_bills
+            content: >-
+              {{ state_attr('sensor.alexela_electricity_unpaid_bills', 'message')
+                 or 'Bill information unavailable. Update Alexela to v0.3.12 or later and check the integration.' }}
           - type: tile
             grid_options:
               rows: auto

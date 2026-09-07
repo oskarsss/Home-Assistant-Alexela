@@ -30,6 +30,40 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   hourly spot-price, reference-cost and cost-difference statistics.
 - Supports Home Assistant reauthentication if the stored JWT becomes invalid.
 
+## Electricity bills
+
+From v0.3.12, the integration polls `/invoice/electricity` every 15 minutes,
+fetching all pages from 2000-01-01 through today in Europe/Riga. It provides:
+
+- `sensor.alexela_electricity_unpaid_bills`: number of bills with a positive
+  remaining balance; attributes include each bill, due date, overdue status,
+  total unpaid amount, and a ready-to-use `message`.
+- `sensor.alexela_electricity_unpaid_amount`: remaining amount in EUR.
+- `sensor.alexela_electricity_next_bill_due_date`: earliest known payment deadline
+  among unpaid bills, including overdue bills. Unknown when none is available.
+
+Balances use `unpaid`, so partially paid invoices show only the amount still
+owed. Credit balances are not subtracted from other unpaid invoices. The due
+date is the API's `deadline`, not a predicted debit or payment-processing date.
+A bill becomes overdue the day after its deadline in Europe/Riga. Missing due
+dates are displayed as unknown. Invoice failures make billing data unknown
+without interrupting consumption sensors; they never imply everything is paid.
+
+A persistent notification is created for each bill on first discovery, five
+days before the payment deadline, and on becoming overdue and every seven days
+thereafter. If polling misses the five-day boundary, the reminder is sent on
+the next successful poll before the deadline. Discovering an already-overdue
+bill starts its weekly reminder clock immediately, without a duplicate alert.
+Reminder history survives Home Assistant restarts. Paid bills are dismissed
+after a successful refresh. Existing persistent-notification forwarding can
+deliver these alerts to mobile devices; dismissing the HA alert does not itself
+clear previously forwarded mobile copies.
+
+The complete dashboard example includes a bills card. For an existing dashboard,
+add [this native card](custom_components/alexela/dashboard_examples/unpaid_bills_card.yaml).
+Existing dashboards are not automatically overwritten by integration updates.
+Entity IDs may differ if you have renamed entities or HA added a suffix.
+
 ## Latest updates
 
 - The initial consumption backfill is unlimited and begins at the first day

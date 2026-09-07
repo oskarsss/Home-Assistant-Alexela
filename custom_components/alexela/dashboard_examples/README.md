@@ -43,3 +43,9 @@ statistics. Every referenced external statistic is created by this integration.
 current-month usage, current-month cost, the month's effective fixed price, and
 the latest matched Nord Pool spot price. Paste it into a manual card's YAML
 editor and adjust locally renamed sensor entity IDs if necessary.
+
+## Unpaid bills
+
+`unpaid_bills_card.yaml` displays unpaid amounts and payment deadlines using the
+new billing sensors in v0.3.12. The complete dashboard includes this card too.
+The unavailable message remains visible until the updated integration is loaded.

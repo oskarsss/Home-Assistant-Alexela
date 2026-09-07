@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -23,10 +23,20 @@ from homeassistant.util import dt as dt_util
 from . import AlexelaConfigEntry
 from .const import CONF_CRM_ID, DOMAIN, PROVIDER_MARKUP_EUR_PER_KWH
 from .coordinator import AlexelaCoordinator
+from .invoices import INVOICE_SUMMARY_KEY
 from .parsing import reference_datetime, sum_rows, total_block
 from .statistics import NORD_POOL_SUMMARY_KEY
 
-ValueFn = Callable[[dict[str, Any]], float | Decimal | None]
+ValueFn = Callable[[dict[str, Any]], float | Decimal | date | None]
+
+
+def _invoice_value(data: dict[str, Any], key: str) -> Any:
+    return data.get(INVOICE_SUMMARY_KEY, {}).get(key)
+
+
+def _invoice_due_date(data: dict[str, Any]) -> date | None:
+    value = _invoice_value(data, "next_due_date")
+    return date.fromisoformat(value) if value else None
 
 
 def _period_block(data: dict[str, Any]) -> dict[str, Any] | None:
@@ -140,6 +150,22 @@ class AlexelaSensorDescription(SensorEntityDescription):
 
 
 SENSORS: tuple[AlexelaSensorDescription, ...] = (
+    AlexelaSensorDescription(
+        key="electricity_unpaid_bills", name="Electricity unpaid bills",
+        icon="mdi:invoice-text-clock-outline",
+        value_fn=lambda data: _invoice_value(data, "unpaid_count"),
+    ),
+    AlexelaSensorDescription(
+        key="electricity_unpaid_amount", name="Electricity unpaid amount",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="EUR", suggested_display_precision=2,
+        value_fn=lambda data: _invoice_value(data, "unpaid_amount"),
+    ),
+    AlexelaSensorDescription(
+        key="electricity_next_bill_due_date", name="Electricity next bill due date",
+        device_class=SensorDeviceClass.DATE,
+        value_fn=_invoice_due_date,
+    ),
     AlexelaSensorDescription(
         key="electricity_ytd",
         name="Electricity consumption YTD",
@@ -282,6 +308,8 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
             "chart_explanation",
             "average_basis",
             "months",
+            "invoices",
+            "message",
         }
     )
 
@@ -303,7 +331,7 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
         )
 
     @property
-    def native_value(self) -> float | Decimal | None:
+    def native_value(self) -> float | Decimal | date | None:
         """Return the current sensor value."""
         data = self.coordinator.data
         if not data:
@@ -319,6 +347,11 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
         which data Home Assistant is showing.
         """
         data = self.coordinator.data or {}
+        if self.entity_description.key in (
+            "electricity_unpaid_bills", "electricity_unpaid_amount",
+            "electricity_next_bill_due_date",
+        ):
+            return data.get(INVOICE_SUMMARY_KEY)
         summary = data.get(NORD_POOL_SUMMARY_KEY)
         if self.entity_description.key in (
             "electricity_month",

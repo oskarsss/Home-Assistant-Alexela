@@ -1,12 +1,12 @@
 {
   "domain": "alexela",
   "name": "Alexela",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "codeowners": [
     "@oskarsss"
   ],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["persistent_notification"],
   "documentation": "https://github.com/oskarsss/Home-Assistant-Alexela",
   "integration_type": "service",
   "iot_class": "cloud_polling",

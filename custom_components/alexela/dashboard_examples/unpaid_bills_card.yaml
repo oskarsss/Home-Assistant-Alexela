@@ -1,0 +1,8 @@
+# Native card; check entity IDs if your installation has renamed sensors.
+type: markdown
+title: Electricity bills
+entity_id:
+  - sensor.alexela_electricity_unpaid_bills
+content: >-
+  {{ state_attr('sensor.alexela_electricity_unpaid_bills', 'message')
+     or 'Bill information unavailable. Update Alexela to v0.3.12 or later and check the integration.' }}

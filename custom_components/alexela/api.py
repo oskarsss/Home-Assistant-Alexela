@@ -117,6 +117,32 @@ class AlexelaApi:
             raise AlexelaConnectionError("Unexpected contracts response")
         return data
 
+    async def async_get_invoices(
+        self, period_start: str, period_end: str
+    ) -> list[dict[str, Any]]:
+        """Fetch every electricity invoice page; never return a partial list."""
+        invoices: dict[str, dict[str, Any]] = {}
+        for page in range(1, 1001):
+            data = await self._get_json(
+                "/invoice/electricity",
+                params={"periodStart": period_start, "periodEnd": period_end,
+                        "pageNr": str(page), "limit": "50"},
+            )
+            if not isinstance(data, dict):
+                raise AlexelaConnectionError("Unexpected invoices response")
+            items, total = data.get("items"), data.get("total")
+            if (not isinstance(items, list) or type(total) is not int or total < 0
+                    or any(not isinstance(item, dict) or not item.get("id")
+                           for item in items)):
+                raise AlexelaConnectionError("Malformed invoices response")
+            previous_count = len(invoices)
+            invoices.update((str(item["id"]), item) for item in items)
+            if len(invoices) == total:
+                return list(invoices.values())
+            if len(invoices) > total or len(invoices) == previous_count:
+                raise AlexelaConnectionError("Incomplete invoices pagination")
+        raise AlexelaConnectionError("Invoice pagination limit exceeded")
+
     async def async_refresh_jwt(self) -> bool:
         """Attempt JWT rotation.
 
