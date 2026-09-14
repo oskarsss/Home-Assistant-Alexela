@@ -729,28 +729,15 @@ class AlexelaStatisticsImporter:
         self, statistic_id: str, start: datetime
     ) -> float:
         """Return the cumulative value immediately before a rewritten tail."""
+        # A newly published day may be separated from the previous imported
+        # row by several unpublished days. Do not limit this lookup to the
+        # previous two hours: when Alexela publishes a delayed block after a
+        # gap, that would incorrectly return zero and restart the cumulative
+        # series. The last row before ``start`` is the correct baseline.
         rows = await get_instance(self.hass).async_add_executor_job(
             statistics_during_period,
             self.hass,
-            start,
-            start + timedelta(hours=1),
-            {statistic_id},
-            "hour",
-            None,
-            {"state", "sum"},
-        )
-        entries = rows.get(statistic_id, [])
-        if entries:
-            first = entries[0]
-            if first.get("sum") is not None and first.get("state") is not None:
-                return float(first["sum"]) - float(first["state"])
-
-        # A newly published day has no row at its first timestamp. The prior
-        # two-hour window covers the normal previous hour and DST transitions.
-        rows = await get_instance(self.hass).async_add_executor_job(
-            statistics_during_period,
-            self.hass,
-            start - timedelta(hours=2),
+            datetime(1970, 1, 1, tzinfo=dt_util.UTC),
             start,
             {statistic_id},
             "hour",
