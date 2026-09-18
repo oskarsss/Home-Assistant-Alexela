@@ -217,17 +217,17 @@ class AlignHourlyProfileTest(unittest.TestCase):
 
 
 class RollingImportDaysTest(unittest.TestCase):
-    def test_caught_up_scan_is_the_latest_ten_calendar_days(self):
+    def test_caught_up_scan_is_the_latest_thirty_calendar_days(self):
         published = [date(2026, 8, day) for day in range(1, 27)]
 
         result = rolling_import_days(
             published,
             date(2026, 8, 26),
             date(2026, 8, 26),
-            reconcile_days=10,
+            reconcile_days=30,
         )
 
-        self.assertEqual(result, [date(2026, 8, day) for day in range(17, 27)])
+        self.assertEqual(result, published)
 
     def test_same_scan_includes_newly_published_days(self):
         published = [date(2026, 8, day) for day in range(1, 27)]
@@ -236,10 +236,23 @@ class RollingImportDaysTest(unittest.TestCase):
             published,
             date(2026, 8, 26),
             date(2026, 8, 24),
-            reconcile_days=10,
+            reconcile_days=30,
         )
 
-        self.assertEqual(result, [date(2026, 8, day) for day in range(17, 27)])
+        self.assertEqual(result, published)
+
+    def test_thirty_day_scan_catches_a_gap_older_than_ten_days(self):
+        published = [date(2026, 9, day) for day in range(1, 19)]
+
+        result = rolling_import_days(
+            published,
+            date(2026, 9, 18),
+            date(2026, 9, 18),
+            reconcile_days=30,
+        )
+
+        self.assertIn(date(2026, 9, 4), result)
+        self.assertEqual(result, published)
 
     def test_initial_backfill_is_unlimited(self):
         published = [
@@ -250,7 +263,7 @@ class RollingImportDaysTest(unittest.TestCase):
             published,
             published[-1],
             None,
-            reconcile_days=10,
+            reconcile_days=30,
         )
 
         self.assertEqual(result, published)
@@ -262,7 +275,7 @@ class RollingImportDaysTest(unittest.TestCase):
             published,
             date(2026, 8, 26),
             None,
-            reconcile_days=10,
+            reconcile_days=30,
         )
 
         self.assertEqual(result[0], date(2026, 8, 10))

@@ -44,6 +44,7 @@ DATA_LAG = timedelta(days=1)
 # Alexela reports timestamps in Latvian local time without an offset.
 PORTAL_TIME_ZONE = "Europe/Riga"
 
-# Alexela may revise recently published consumption. Once the historical
-# backfill is contiguous, re-read this rolling window on every update.
-RECONCILE_DAYS = 10
+# Alexela may publish or revise consumption with a long delay. Once the
+# historical backfill is contiguous, re-read the latest 30 calendar days on
+# every update so gaps such as a late-published day are eventually repaired.
+RECONCILE_DAYS = 30
