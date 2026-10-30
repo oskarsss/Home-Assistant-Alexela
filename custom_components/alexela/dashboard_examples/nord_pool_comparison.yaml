@@ -56,33 +56,31 @@ views:
             icon: mdi:cash-multiple
           - type: tile
             grid_options:
-              rows: auto
+              columns: 12
             entity: sensor.alexela_electricity_cost_this_month
-            name: This month
+            name: Cost this month
             icon: mdi:calendar-month
             state_content:
               - state
               - average_period_label
-            vertical: true
+            vertical: false
             features_position: bottom
           - type: tile
             grid_options:
-              columns: 6
-              rows: auto
+              columns: 12
             entity: sensor.alexela_electricity_cost_last_7_available_days
-            name: Last 7 days
+            name: Cost last 7 days
             icon: mdi:calendar-week
             state_content:
               - state
               - average_period_label
-            vertical: true
+            vertical: false
             features_position: bottom
           - type: tile
             grid_options:
-              columns: full
-              rows: auto
+              columns: 12
             entity: sensor.alexela_electricity_consumption_this_month
-            name: This month
+            name: Usage this month
             icon: mdi:meter-electric
             state_content:
               - state
@@ -126,18 +124,22 @@ views:
               - entity: sensor.alexela_electricity_15_minute_history
                 name: 15-minute usage
                 type: column
-                color: "#f1c40f"
+                color: "#2a78d6"
                 unit: Wh
                 float_precision: 0
                 show:
                   legend_value: false
                 data_generator: |
                   return (entity.attributes.interval_readings || [])
+                    .filter((point) => {
+                      const t = new Date(point.start).getTime();
+                      return t >= start.getTime() && t <= end.getTime();
+                    })
                     .map((point) => [new Date(point.start).getTime(), point.kwh * 1000]);
               - entity: sensor.alexela_electricity_15_minute_history
                 name: Typical · weekday and time band
                 type: line
-                color: "#3498db"
+                color: "#898781"
                 curve: smooth
                 stroke_width: 3
                 unit: Wh
@@ -147,6 +149,10 @@ views:
                 extend_to: false
                 data_generator: |
                   return (entity.attributes.hourly_profile || [])
+                    .filter((point) => {
+                      const t = new Date(point.start).getTime();
+                      return t >= start.getTime() && t <= end.getTime();
+                    })
                     .map((point) => [new Date(point.start).getTime(), point.kwh * 1000]);
             grid_options:
               columns: full
@@ -175,7 +181,7 @@ views:
               - entity: sensor.alexela_electricity_15_minute_history
                 name: Daily usage
                 type: column
-                color: "#64a8d1"
+                color: "#2a78d6"
                 float_precision: 2
                 show:
                   legend_value: false
@@ -185,7 +191,7 @@ views:
               - entity: sensor.alexela_electricity_15_minute_history
                 name: Average daily usage · calendar month
                 type: line
-                color: "#3498db"
+                color: "#898781"
                 curve: smooth
                 stroke_width: 3
                 float_precision: 2
@@ -370,7 +376,7 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
                 name: kWh
-                color: "#f1c40f"
+                color: "#2a78d6"
             days_to_show: 730
             chart_type: bar
             stat_types:
@@ -382,27 +388,11 @@ views:
               columns: full
               rows: 7
           - type: statistics-graph
-            title: Annual consumption · 5 years
-            entities:
-              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
-                name: kWh
-                color: "#f39c12"
-            days_to_show: 1825
-            chart_type: bar
-            stat_types:
-              - change
-            period: year
-            min_y_axis: 0
-            fit_y_data: true
-            grid_options:
-              columns: full
-              rows: 6
-          - type: statistics-graph
             title: Daily consumption · 90 days
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_energy
                 name: kWh
-                color: "#f1c40f"
+                color: "#2a78d6"
             days_to_show: 90
             chart_type: bar
             stat_types:
@@ -491,7 +481,7 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
                 name: Fixed cost
-                color: "#e67e22"
+                color: "#eb6834"
             days_to_show: 730
             chart_type: bar
             stat_types:
@@ -502,22 +492,6 @@ views:
             grid_options:
               columns: full
               rows: 7
-          - type: statistics-graph
-            title: Annual fixed cost · 5 years
-            entities:
-              - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
-                name: Fixed cost
-                color: "#d35400"
-            days_to_show: 1825
-            chart_type: bar
-            stat_types:
-              - change
-            period: year
-            min_y_axis: 0
-            fit_y_data: true
-            grid_options:
-              columns: full
-              rows: 6
 
       - type: grid
         cards:
@@ -530,10 +504,10 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
                 name: Fixed price
-                color: "#e67e22"
+                color: "#eb6834"
               - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
                 name: Nord Pool + markup
-                color: "#2980b9"
+                color: "#1baf7a"
             days_to_show: 730
             chart_type: bar
             stat_types:
@@ -549,10 +523,10 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
                 name: Fixed price
-                color: "#e67e22"
+                color: "#eb6834"
               - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
                 name: Nord Pool + markup
-                color: "#2980b9"
+                color: "#1baf7a"
             days_to_show: 60
             chart_type: bar
             stat_types:
@@ -568,7 +542,7 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool_provider
                 name: Positive = fixed cost more
-                color: "#8e44ad"
+                color: "#6250d6"
             days_to_show: 60
             chart_type: bar
             stat_types:
@@ -583,10 +557,10 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
                 name: Fixed price
-                color: "#e67e22"
+                color: "#eb6834"
               - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_reference_cost
                 name: Nord Pool + markup
-                color: "#2980b9"
+                color: "#1baf7a"
             days_to_show: 90
             chart_type: line
             stat_types:
@@ -602,7 +576,7 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost_difference_vs_nord_pool_provider
                 name: Fixed minus Nord Pool
-                color: "#8e44ad"
+                color: "#6250d6"
             days_to_show: 90
             chart_type: line
             stat_types:
@@ -624,10 +598,10 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_daily_effective_price
                 name: Fixed price
-                color: "#e67e22"
+                color: "#eb6834"
               - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_provider_daily_reference_price
                 name: Nord Pool + markup
-                color: "#2980b9"
+                color: "#1baf7a"
             days_to_show: 31
             chart_type: line
             stat_types:
@@ -642,7 +616,7 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_price
                 name: Nord Pool incl. VAT
-                color: "#2980b9"
+                color: "#1baf7a"
             days_to_show: 60
             chart_type: line
             stat_types:
@@ -659,7 +633,7 @@ views:
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_nord_pool_price
                 name: EUR/kWh
-                color: "#2980b9"
+                color: "#1baf7a"
             days_to_show: 7
             chart_type: line
             stat_types:
@@ -696,9 +670,9 @@ views:
               {% set months = state_attr('sensor.alexela_recorded_monthly_average', 'months') or [] %}
               | Month | Consumption |
               |:--|--:|
-              {% for item in months %}
+              {% for item in months -%}
               | {{ item.month }}{% if not item.complete %} *(partial)*{% endif %} | {{ item.kwh | round(2) }} kWh |
-              {% else %}
+              {% else -%}
               | No recorded months yet | — |
               {% endfor %}
             entity_id:
@@ -734,9 +708,9 @@ views:
 
               | Rank | Month | Consumption |
               |--:|:--|--:|
-              {% for item in months %}
+              {% for item in months -%}
               | {{ item.rank }} | {{ item.month }} | {{ item.kwh | round(2) }} kWh |
-              {% else %}
+              {% else -%}
               | — | No completed months yet | — |
               {% endfor %}
             entity_id:
@@ -772,9 +746,9 @@ views:
 
               | Rank | Month | Consumption |
               |--:|:--|--:|
-              {% for item in months %}
+              {% for item in months -%}
               | {{ item.rank }} | {{ item.month }} | {{ item.kwh | round(2) }} kWh |
-              {% else %}
+              {% else -%}
               | — | No completed months yet | — |
               {% endfor %}
             entity_id:

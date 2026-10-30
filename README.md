@@ -70,6 +70,12 @@ Entity IDs may differ if you have renamed entities or HA added a suffix.
 
 ## Latest updates
 
+- Dashboard example (v0.3.17): one colour per data series on every chart
+  (usage blue, fixed price orange, Nord Pool green, difference violet) and
+  grey for typical/average reference lines. The 48-hour chart only plots the
+  shown window, cost and usage tiles have distinct names, the one-bar annual
+  charts are gone (the year cards cover them), and the month tables no longer
+  break on blank lines.
 - The initial consumption backfill is unlimited and begins at the first day
   Alexela actually lists for the account. It proceeds chronologically until an
   empty or malformed daily response is encountered, then retries that boundary.
