@@ -70,6 +70,10 @@ Entity IDs may differ if you have renamed entities or HA added a suffix.
 
 ## Latest updates
 
+- New `Fixed vs Nord Pool gap` sensor (v0.3.18): the size of the fixed-price
+  vs Nord Pool difference without a sign. The dashboard example shows it as
+  a "Nord Pool costs more" or "Fixed costs more" badge, so the badge
+  never needs a minus sign.
 - Dashboard example (v0.3.17): one colour per data series on every chart
   (usage blue, fixed price orange, Nord Pool green, difference violet) and
   grey for typical/average reference lines. The 48-hour chart only plots the

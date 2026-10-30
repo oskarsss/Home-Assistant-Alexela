@@ -22,12 +22,36 @@ views:
         show_name: true
         show_state: true
         color: amber
+      # One of these two shows, so the amount never needs a minus sign.
+      # Scope: all consumption since the Nord Pool comparison began.
       - type: entity
-        entity: sensor.alexela_latest_nord_pool_price_incl_vat
-        name: Latest spot
+        entity: sensor.alexela_fixed_vs_nord_pool_gap
+        name: Nord Pool costs more
+        icon: mdi:piggy-bank-outline
         show_name: true
         show_state: true
-        color: blue
+        color: green
+        tap_action:
+          action: more-info
+          entity: sensor.alexela_electricity_cost_difference_vs_comparison
+        visibility:
+          - condition: numeric_state
+            entity: sensor.alexela_electricity_cost_difference_vs_comparison
+            below: 0
+      - type: entity
+        entity: sensor.alexela_fixed_vs_nord_pool_gap
+        name: Fixed costs more
+        icon: mdi:cash-plus
+        show_name: true
+        show_state: true
+        color: orange
+        tap_action:
+          action: more-info
+          entity: sensor.alexela_electricity_cost_difference_vs_comparison
+        visibility:
+          - condition: numeric_state
+            entity: sensor.alexela_electricity_cost_difference_vs_comparison
+            above: 0
     sections:
       - type: grid
         cards:

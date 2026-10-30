@@ -132,6 +132,11 @@ def _nord_pool_summary_value(data: dict[str, Any], key: str) -> float | None:
     return float(value) if value is not None else None
 
 
+def _absolute(value: float | None) -> float | None:
+    """Return the size of a signed value, keeping unknown as unknown."""
+    return abs(value) if value is not None else None
+
+
 def _latest_day_energy(data: dict[str, Any]) -> float | None:
     """Return consumption for Alexela's latest available day."""
     return _nord_pool_summary_value(data, "latest_day_kwh")
@@ -279,6 +284,16 @@ SENSORS: tuple[AlexelaSensorDescription, ...] = (
         native_unit_of_measurement="EUR",
         suggested_display_precision=3,
         value_fn=lambda data: _nord_pool_summary_value(data, "difference"),
+    ),
+    AlexelaSensorDescription(
+        key="nord_pool_cost_gap",
+        name="Fixed vs Nord Pool gap",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="EUR",
+        suggested_display_precision=2,
+        value_fn=lambda data: _absolute(
+            _nord_pool_summary_value(data, "difference")
+        ),
     ),
 )
 
@@ -468,6 +483,7 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
             "nord_pool_price_latest",
             "nord_pool_reference_cost",
             "electricity_cost_difference_vs_nord_pool",
+            "nord_pool_cost_gap",
         ):
             summary = data.get(NORD_POOL_SUMMARY_KEY)
             if not isinstance(summary, dict) or not summary.get("data_through"):
@@ -494,6 +510,13 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
             ):
                 attributes["interpretation"] = (
                     "positive means Alexela cost was higher; negative means savings"
+                )
+            if self.entity_description.key == "nord_pool_cost_gap":
+                difference = summary.get("difference")
+                attributes["cheaper"] = (
+                    None
+                    if difference is None
+                    else "fixed price" if float(difference) <= 0 else "Nord Pool"
                 )
             return attributes
 

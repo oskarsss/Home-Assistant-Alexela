@@ -33,6 +33,10 @@ displayed difference reconciles with the two displayed totals.
 4. If Home Assistant suffixed or renamed a normal `sensor.alexela_*` entity,
    replace that entity ID with the one shown under
    **Settings -> Devices & services -> Alexela**.
+   Older installs may name the difference sensor
+   `sensor.alexela_electricity_cost_difference_vs_nord_pool` instead of
+   `sensor.alexela_electricity_cost_difference_vs_comparison`; the two
+   comparison badges at the top use it to pick their wording.
 
 The template deliberately excludes installation-specific `alexela_price:*`
 statistics. Every referenced external statistic is created by this integration.
