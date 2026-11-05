@@ -48,3 +48,6 @@ PORTAL_TIME_ZONE = "Europe/Riga"
 # historical backfill is contiguous, re-read the latest 30 calendar days on
 # every update so gaps such as a late-published day are eventually repaired.
 RECONCILE_DAYS = 30
+
+# Coordinator data key describing how fresh the consumption values are.
+SNAPSHOT_KEY = "consumption_snapshot"

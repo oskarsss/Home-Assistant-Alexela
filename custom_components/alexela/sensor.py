@@ -21,7 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from . import AlexelaConfigEntry
-from .const import CONF_CRM_ID, DOMAIN, PROVIDER_MARKUP_EUR_PER_KWH
+from .const import CONF_CRM_ID, DOMAIN, PROVIDER_MARKUP_EUR_PER_KWH, SNAPSHOT_KEY
 from .coordinator import AlexelaCoordinator
 from .invoices import INVOICE_SUMMARY_KEY
 from .parsing import reference_datetime, sum_rows, total_block
@@ -145,6 +145,41 @@ def _latest_day_energy(data: dict[str, Any]) -> float | None:
 def _last_seven_cost(data: dict[str, Any]) -> float | None:
     """Return the cost of the latest seven available days."""
     return _nord_pool_summary_value(data, "last_seven_cost")
+
+
+INVOICE_SENSOR_KEYS = frozenset(
+    {
+        "electricity_unpaid_bills",
+        "electricity_unpaid_amount",
+        "electricity_next_bill_due_date",
+    }
+)
+# Values named after the current month or year. A stale cache must not show
+# an earlier month's total as "this month".
+MONTH_SENSOR_KEYS = frozenset(
+    {"electricity_month", "electricity_cost_month", "electricity_price_month"}
+)
+YEAR_SENSOR_KEYS = frozenset({"electricity_ytd", "electricity_cost_ytd"})
+
+
+def _snapshot(data: dict[str, Any]) -> dict[str, Any]:
+    snapshot = data.get(SNAPSHOT_KEY)
+    return snapshot if isinstance(snapshot, dict) else {}
+
+
+def _stale_period(data: dict[str, Any], key: str) -> bool:
+    """Return whether cached data covers an earlier period than the sensor's."""
+    if not _snapshot(data).get("stale"):
+        return False
+    period = _period_start(data)
+    if period is None:
+        return False
+    reference = reference_datetime()
+    if key in MONTH_SENSOR_KEYS:
+        return (period.year, period.month) < (reference.year, reference.month)
+    if key in YEAR_SENSOR_KEYS:
+        return period.year < reference.year
+    return False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -325,6 +360,7 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
             "months",
             "invoices",
             "message",
+            "last_successful_update",
         }
     )
 
@@ -349,12 +385,29 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
     def native_value(self) -> float | Decimal | date | None:
         """Return the current sensor value."""
         data = self.coordinator.data
-        if not data:
+        if not data or _stale_period(data, self.entity_description.key):
             return None
         return self.entity_description.value_fn(data)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Add consumption freshness to the per-sensor attributes."""
+        attributes = self._sensor_attributes()
+        data = self.coordinator.data or {}
+        if self.entity_description.key in INVOICE_SENSOR_KEYS:
+            return attributes
+        snapshot = _snapshot(data)
+        if not snapshot:
+            return attributes
+        freshness: dict[str, Any] = {
+            "last_successful_update": snapshot.get("fetched_at"),
+            "data_stale": bool(snapshot.get("stale")),
+        }
+        if snapshot.get("stale"):
+            freshness["stale_reason"] = snapshot.get("stale_reason")
+        return {**(attributes or {}), **freshness}
+
+    def _sensor_attributes(self) -> dict[str, Any] | None:
         """Expose the period the value actually covers.
 
         Alexela lags about a day behind, so the reported month is not always the
@@ -362,10 +415,7 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
         which data Home Assistant is showing.
         """
         data = self.coordinator.data or {}
-        if self.entity_description.key in (
-            "electricity_unpaid_bills", "electricity_unpaid_amount",
-            "electricity_next_bill_due_date",
-        ):
+        if self.entity_description.key in INVOICE_SENSOR_KEYS:
             return data.get(INVOICE_SUMMARY_KEY)
         summary = data.get(NORD_POOL_SUMMARY_KEY)
         if self.entity_description.key in (

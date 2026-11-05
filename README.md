@@ -70,6 +70,12 @@ Entity IDs may differ if you have renamed entities or HA added a suffix.
 
 ## Latest updates
 
+- Expired tokens no longer blank the dashboard (v0.3.19). The last
+  successfully received consumption data, including the 15-minute and daily
+  chart data, is saved to disk. It loads at startup and stays visible while
+  Home Assistant asks for a new token. Sensors show `data_stale`,
+  `stale_reason` and `last_successful_update` attributes. Bills are never
+  served from that cache.
 - New `Fixed vs Nord Pool gap` sensor (v0.3.18): the size of the fixed-price
   vs Nord Pool difference without a sign. The dashboard example shows it as
   a "Nord Pool costs more" or "Fixed costs more" badge, so the badge
@@ -165,6 +171,8 @@ Alexela publishes consumption with about a day of delay, and the portal is not a
 - Every period lookup is anchored on **yesterday**, not today. Asking for today's period would return nothing on the first day of a month or year.
 - The sensors report the newest month Alexela has actually published. Right after a month rolls over, that is still the previous month; the `data_period_start` attribute on each sensor shows which period the value covers.
 - If Alexela is unreachable or returns an empty response, the last successfully received values are kept instead of the sensors going unavailable. The reason is logged as a warning.
+- The last good consumption data is saved to disk, so it is also kept across Home Assistant restarts and while the token is expired and waiting for reauthentication. Consumption sensors expose `last_successful_update`, `data_stale` and, when stale, `stale_reason` (`authentication`, `connection` or `empty response`).
+- Stale data never pretends to be current: the *this month* sensors become unknown once the cached data is from an earlier month, and the YTD sensors once it is from an earlier year. Bill sensors are never cached; while the token is invalid they are unknown, which does not mean bills are paid.
 - If the current year is still empty (early January), the previous year is fetched instead.
 
 If every sensor shows **Unknown** (as opposed to *Unavailable*), the poll succeeded but the response could not be parsed. Enable debug logging to see the raw payload:
