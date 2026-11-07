@@ -195,6 +195,24 @@ def rolling_import_days(
     return sorted(set(pending) | set(recent))
 
 
+def reconcile_window(
+    last_full_reconcile: datetime | None,
+    now: datetime,
+    *,
+    full_days: int,
+    quick_days: int,
+    full_interval: timedelta,
+) -> int:
+    """Return how many recent days this update re-reads.
+
+    The full window repairs late revisions; running it every poll floods
+    Alexela, so it runs once per interval and after every restart.
+    """
+    if last_full_reconcile is None or now - last_full_reconcile >= full_interval:
+        return full_days
+    return quick_days
+
+
 def estimate_month_bill(
     month_start: date,
     daily_energy: Sequence[float],

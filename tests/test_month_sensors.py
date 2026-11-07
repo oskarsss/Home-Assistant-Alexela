@@ -1,15 +1,17 @@
 """This-month sensors must not fall back a month when Alexela drops its row."""
 import ast
 from datetime import datetime
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Any
 import unittest
+from zoneinfo import ZoneInfo
 
 SOURCE = Path(__file__).parents[1] / "custom_components/alexela/sensor.py"
 FUNCTIONS = {
     "_statistics_month", "_unlisted_month", "_period_block",
     "_listed_period_block", "_with_unlisted_month", "_ytd_energy",
-    "_month_energy", "_month_cost", "_ytd_cost",
+    "_month_energy", "_month_cost", "_ytd_cost", "_period_start",
 }
 
 
@@ -30,8 +32,24 @@ namespace: dict[str, Any] = {
     "Any": Any, "NORD_POOL_SUMMARY_KEY": "nord_pool",
     "total_block": total_block, "sum_rows": sum_rows,
     "reference_datetime": lambda: datetime(2026, 11, 6),
+    "datetime": datetime, "ZoneInfo": ZoneInfo, "PORTAL_TIME_ZONE": "Europe/Riga",
+    "dt_util": SimpleNamespace(parse_datetime=datetime.fromisoformat),
 }
+sensor_class = next(node for node in tree.body
+                    if isinstance(node, ast.ClassDef) and node.name == "AlexelaSensor")
+last_reset = next(node for node in sensor_class.body
+                  if isinstance(node, ast.FunctionDef) and node.name == "last_reset")
+last_reset.decorator_list = []
+functions.append(last_reset)
 exec(compile(ast.Module(body=functions, type_ignores=[]), "<sensor>", "exec"), namespace)
+
+
+def reset_for(key, data):
+    sensor = SimpleNamespace(
+        entity_description=SimpleNamespace(key=key),
+        coordinator=SimpleNamespace(data=data),
+    )
+    return namespace["last_reset"](sensor)
 
 OCTOBER = {"timestamp": "2026-10-01T00:00:00", "amount": 120.62, "priceWithVat": 15.077}
 SUMMARY = {
@@ -82,6 +100,16 @@ class MonthSensorTests(unittest.TestCase):
             self.assertEqual(namespace["_ytd_cost"](data), 2.5)
         finally:
             namespace["reference_datetime"] = reference
+
+    def test_cost_totals_reset_with_their_period_in_latvian_time(self):
+        data = payload([OCTOBER])
+        riga = ZoneInfo("Europe/Riga")
+
+        self.assertEqual(reset_for("electricity_cost_month", data),
+                         datetime(2026, 11, 1, tzinfo=riga))
+        self.assertEqual(reset_for("electricity_cost_ytd", data),
+                         datetime(2026, 1, 1, tzinfo=riga))
+        self.assertIsNone(reset_for("electricity_month", data))
 
     def test_without_statistics_yearly_view_is_used(self):
         data = payload([OCTOBER], None)

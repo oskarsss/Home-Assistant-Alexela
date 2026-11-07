@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -21,7 +22,13 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from . import AlexelaConfigEntry
-from .const import CONF_CRM_ID, DOMAIN, PROVIDER_MARKUP_EUR_PER_KWH, SNAPSHOT_KEY
+from .const import (
+    CONF_CRM_ID,
+    DOMAIN,
+    PORTAL_TIME_ZONE,
+    PROVIDER_MARKUP_EUR_PER_KWH,
+    SNAPSHOT_KEY,
+)
 from .coordinator import AlexelaCoordinator
 from .invoices import INVOICE_SUMMARY_KEY
 from .parsing import reference_datetime, sum_rows, total_block
@@ -108,7 +115,7 @@ def _period_start(data: dict[str, Any]) -> datetime | None:
     if parsed is None:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=dt_util.now().tzinfo)
+        parsed = parsed.replace(tzinfo=ZoneInfo(PORTAL_TIME_ZONE))
     return parsed
 
 

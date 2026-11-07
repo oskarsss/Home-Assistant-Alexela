@@ -34,5 +34,20 @@
       "already_configured": "This Alexela CRM ID is already configured.",
       "reauth_successful": "Alexela authentication was updated successfully."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Bill estimate tariff",
+        "description": "Charges added to Alexela's energy cost for the estimated bill, all excluding VAT, as itemised on your invoice. The defaults are the 2026 tariff for a PAMATA-1 1F 20 A connection.",
+        "data": {
+          "bill_monthly_fee": "Monthly fee (EUR)",
+          "bill_capacity_eur_per_amp": "Capacity charge per ampere (EUR/A per month)",
+          "bill_connection_amps": "Connection size (A)",
+          "bill_distribution_eur_per_kwh": "Distribution (EUR/kWh)",
+          "bill_balancing_eur_per_kwh": "Balancing capacity (EUR/kWh)"
+        }
+      }
+    }
   }
 }

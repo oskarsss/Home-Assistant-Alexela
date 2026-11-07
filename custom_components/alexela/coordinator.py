@@ -69,6 +69,7 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.api,
             NordPoolApi(aiohttp_client.async_get_clientsession(hass)),
             entry.data[CONF_CRM_ID],
+            entry.options,
         )
         super().__init__(
             hass,

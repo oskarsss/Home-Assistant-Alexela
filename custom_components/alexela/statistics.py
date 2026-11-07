@@ -9,6 +9,7 @@ straight into long-term statistics at the timestamps they belong to.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from datetime import date, datetime, timedelta, tzinfo
 import logging
 from typing import Any
@@ -34,19 +35,23 @@ from .analytics import (
     monthly_daily_profile,
     recorded_month_records,
     recorded_month_totals,
+    reconcile_window,
     rolling_import_days,
     typical_hourly_profile,
 )
 from .const import (
-    BILL_BALANCING_EUR_PER_KWH,
-    BILL_CAPACITY_EUR_PER_AMP,
-    BILL_CONNECTION_AMPS,
-    BILL_DISTRIBUTION_EUR_PER_KWH,
-    BILL_MONTHLY_FEE_EUR,
+    BILL_DEFAULTS,
+    CONF_BILL_BALANCING_EUR_PER_KWH,
+    CONF_BILL_CAPACITY_EUR_PER_AMP,
+    CONF_BILL_CONNECTION_AMPS,
+    CONF_BILL_DISTRIBUTION_EUR_PER_KWH,
+    CONF_BILL_MONTHLY_FEE,
     DOMAIN,
+    FULL_RECONCILE_INTERVAL,
     LATVIA_VAT_MULTIPLIER,
     NORD_POOL_INITIAL_BACKFILL_DAYS,
     PORTAL_TIME_ZONE,
+    QUICK_RECONCILE_DAYS,
     RECONCILE_DAYS,
 )
 from .nordpool import (
@@ -207,10 +212,13 @@ class AlexelaStatisticsImporter:
         api: AlexelaApi,
         nord_pool_api: NordPoolApi,
         crm_id: str,
+        bill_options: Mapping[str, Any] | None = None,
     ) -> None:
         self.hass = hass
         self.api = api
         self.nord_pool_api = nord_pool_api
+        self.bill = {**BILL_DEFAULTS, **(bill_options or {})}
+        self._last_full_reconcile: datetime | None = None
         self.energy_id = f"{DOMAIN}:{crm_id}_electricity_energy"
         self.cost_id = f"{DOMAIN}:{crm_id}_electricity_cost"
         self.daily_average_id = (
@@ -245,6 +253,14 @@ class AlexelaStatisticsImporter:
     async def async_update(self, year_payload: dict[str, Any]) -> dict[str, Any]:
         """Backfill published history and reconcile the recent rolling tail."""
         zone = await dt_util.async_get_time_zone(PORTAL_TIME_ZONE) or dt_util.UTC
+        started = dt_util.utcnow()
+        reconcile_days = reconcile_window(
+            self._last_full_reconcile,
+            started,
+            full_days=RECONCILE_DAYS,
+            quick_days=QUICK_RECONCILE_DAYS,
+            full_interval=FULL_RECONCILE_INTERVAL,
+        )
         last_energy = await self._async_last_statistic(self.energy_id)
         last_cost = await self._async_last_statistic(self.cost_id)
         last_nord_pool_cost = await self._async_last_statistic(self.nord_pool_cost_id)
@@ -301,8 +317,12 @@ class AlexelaStatisticsImporter:
             if imported_through is not None
             else None
         )
-        days = await self._async_pending_days(year_payload, zone, oldest_through)
+        days = await self._async_pending_days(
+            year_payload, zone, oldest_through, reconcile_days
+        )
         if not days:
+            if reconcile_days == RECONCILE_DAYS:
+                self._last_full_reconcile = started
             if (
                 last_daily_average is None
                 or last_hourly_profile is None
@@ -338,7 +358,7 @@ class AlexelaStatisticsImporter:
         daily_cost = await self._async_daily_cost()
         hourly_energy = await self._async_hourly_energy()
         reconcile_start = reference_datetime().date() - timedelta(
-            days=RECONCILE_DAYS - 1
+            days=reconcile_days - 1
         )
         energy_days = {
             day
@@ -399,6 +419,9 @@ class AlexelaStatisticsImporter:
         daily_reference_price_stats: list[StatisticData] = []
         recent_intervals: list[tuple[datetime, float]] = []
         comparison_paused = False
+        # First day left unimported when Alexela or Nord Pool fails mid-run.
+        paused_at: date | None = None
+        comparison_paused_at: date | None = None
 
         for index, day in enumerate(days):
             if index:
@@ -418,6 +441,7 @@ class AlexelaStatisticsImporter:
                     day,
                     err,
                 )
+                paused_at = day
                 break
             if not buckets:
                 # Alexela answers HTTP 200 with an empty payload when it is
@@ -429,6 +453,7 @@ class AlexelaStatisticsImporter:
                     "statistics import there and retrying later",
                     day,
                 )
+                paused_at = day
                 break
 
             recent_intervals.extend(raw_intervals)
@@ -474,6 +499,7 @@ class AlexelaStatisticsImporter:
                     comparison_buckets = nord_pool_hourly_buckets(payload, prices, zone)
                 except NordPoolError as err:
                     comparison_paused = True
+                    comparison_paused_at = day
                     _LOGGER.warning(
                         "Could not import Nord Pool comparison for %s (%s); "
                         "pausing there and retrying later",
@@ -536,6 +562,37 @@ class AlexelaStatisticsImporter:
                                 sum=difference_sum,
                             )
                         )
+
+        if paused_at is not None and energy_stats:
+            # Rows from the pause onwards still carry sums built on the values
+            # just replaced; continue them from the new totals so the series
+            # does not step until the next successful run.
+            resume = self._day_start(paused_at, zone)
+            energy_stats.extend(
+                await self._async_rebased_tail(self.energy_id, resume, energy_sum)
+            )
+            cost_stats.extend(
+                await self._async_rebased_tail(self.cost_id, resume, cost_sum)
+            )
+        comparison_resume_day = comparison_paused_at or paused_at
+        if comparison_resume_day is not None and nord_pool_cost_stats:
+            resume = self._day_start(comparison_resume_day, zone)
+            nord_pool_cost_stats.extend(
+                await self._async_rebased_tail(
+                    self.nord_pool_cost_id, resume, nord_pool_cost_sum
+                )
+            )
+            difference_stats.extend(
+                await self._async_rebased_tail(
+                    self.nord_pool_difference_id, resume, difference_sum
+                )
+            )
+        if (
+            reconcile_days == RECONCILE_DAYS
+            and paused_at is None
+            and not comparison_paused
+        ):
+            self._last_full_reconcile = started
 
         if energy_stats:
             # Home Assistant updates an existing external-statistics row when
@@ -629,12 +686,12 @@ class AlexelaStatisticsImporter:
             )
 
         latest_cost = (
-            (nord_pool_cost_stats[-1]["start"], nord_pool_cost_sum)
+            (nord_pool_cost_stats[-1]["start"], nord_pool_cost_stats[-1]["sum"])
             if nord_pool_cost_stats
             else last_nord_pool_cost
         )
         latest_difference = (
-            (difference_stats[-1]["start"], difference_sum)
+            (difference_stats[-1]["start"], difference_stats[-1]["sum"])
             if difference_stats
             else last_difference
         )
@@ -731,6 +788,40 @@ class AlexelaStatisticsImporter:
             start = dt_util.utc_from_timestamp(start)
         value = entries[0].get(value_field)
         return (start, float(value)) if value is not None else None
+
+    @staticmethod
+    def _day_start(day: date, zone: tzinfo) -> datetime:
+        return datetime.combine(day, datetime.min.time(), zone).astimezone(
+            dt_util.UTC
+        )
+
+    async def _async_rebased_tail(
+        self, statistic_id: str, start: datetime, running_sum: float
+    ) -> list[StatisticData]:
+        """Return the stored hours from ``start`` re-summed onto a new total."""
+        rows = await get_instance(self.hass).async_add_executor_job(
+            statistics_during_period,
+            self.hass,
+            start,
+            None,
+            {statistic_id},
+            "hour",
+            None,
+            {"state"},
+        )
+        tail: list[StatisticData] = []
+        for row in rows.get(statistic_id, []):
+            state = row.get("state")
+            if state is None:
+                continue
+            timestamp = row["start"]
+            if isinstance(timestamp, (int, float)):
+                timestamp = dt_util.utc_from_timestamp(timestamp)
+            running_sum += float(state)
+            tail.append(
+                StatisticData(start=timestamp, state=float(state), sum=running_sum)
+            )
+        return tail
 
     async def _async_running_sum_before(
         self, statistic_id: str, start: datetime
@@ -977,10 +1068,12 @@ class AlexelaStatisticsImporter:
                 latest_day[0].astimezone(zone).date().replace(day=1),
                 month_energy,
                 month_cost,
-                monthly_fee=BILL_MONTHLY_FEE_EUR,
-                capacity_fee=BILL_CAPACITY_EUR_PER_AMP * BILL_CONNECTION_AMPS,
+                monthly_fee=float(self.bill[CONF_BILL_MONTHLY_FEE]),
+                capacity_fee=float(self.bill[CONF_BILL_CAPACITY_EUR_PER_AMP])
+                * float(self.bill[CONF_BILL_CONNECTION_AMPS]),
                 network_eur_per_kwh=(
-                    BILL_DISTRIBUTION_EUR_PER_KWH + BILL_BALANCING_EUR_PER_KWH
+                    float(self.bill[CONF_BILL_DISTRIBUTION_EUR_PER_KWH])
+                    + float(self.bill[CONF_BILL_BALANCING_EUR_PER_KWH])
                 ),
                 vat_multiplier=LATVIA_VAT_MULTIPLIER,
             )
@@ -1087,6 +1180,7 @@ class AlexelaStatisticsImporter:
         year_payload: dict[str, Any],
         zone: tzinfo,
         imported_through: date | None,
+        reconcile_days: int,
     ) -> list[date]:
         """Return the contiguous backfill or rolling reconciliation days.
 
@@ -1095,7 +1189,7 @@ class AlexelaStatisticsImporter:
         new days and revisions within the latest reconciliation window.
         """
         newest = reference_datetime().date()  # Alexela is a day behind
-        reconcile_start = newest - timedelta(days=RECONCILE_DAYS - 1)
+        reconcile_start = newest - timedelta(days=reconcile_days - 1)
         earliest_needed = (
             min(imported_through + timedelta(days=1), reconcile_start)
             if imported_through is not None
@@ -1130,5 +1224,5 @@ class AlexelaStatisticsImporter:
             days,
             newest,
             imported_through,
-            reconcile_days=RECONCILE_DAYS,
+            reconcile_days=reconcile_days,
         )

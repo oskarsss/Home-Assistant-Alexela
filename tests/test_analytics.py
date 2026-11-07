@@ -23,6 +23,7 @@ estimate_month_bill = ANALYTICS.estimate_month_bill
 monthly_daily_profile = ANALYTICS.monthly_daily_profile
 recorded_month_totals = ANALYTICS.recorded_month_totals
 recorded_month_records = ANALYTICS.recorded_month_records
+reconcile_window = ANALYTICS.reconcile_window
 rolling_import_days = ANALYTICS.rolling_import_days
 typical_hourly_profile = ANALYTICS.typical_hourly_profile
 
@@ -215,6 +216,25 @@ class AlignHourlyProfileTest(unittest.TestCase):
             align_hourly_profile_to_intervals(intervals, [(hour, 0.2)]),
             [(start, 0.2) for start in intervals],
         )
+
+
+class ReconcileWindowTest(unittest.TestCase):
+    NOW = datetime(2026, 11, 7, 12, tzinfo=timezone.utc)
+
+    def window(self, last):
+        return reconcile_window(
+            last, self.NOW, full_days=30, quick_days=2,
+            full_interval=timedelta(hours=6),
+        )
+
+    def test_first_update_after_start_reconciles_fully(self):
+        self.assertEqual(self.window(None), 30)
+
+    def test_polls_between_full_runs_read_only_the_latest_days(self):
+        self.assertEqual(self.window(self.NOW - timedelta(hours=5)), 2)
+
+    def test_full_run_repeats_once_the_interval_has_passed(self):
+        self.assertEqual(self.window(self.NOW - timedelta(hours=6)), 30)
 
 
 class RollingImportDaysTest(unittest.TestCase):

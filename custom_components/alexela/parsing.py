@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime, tzinfo
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from homeassistant.util import dt as dt_util
 
-from .const import DATA_LAG
+from .const import DATA_LAG, PORTAL_TIME_ZONE
 
 
 def reference_datetime() -> datetime:
@@ -15,9 +16,10 @@ def reference_datetime() -> datetime:
 
     The portal publishes consumption with about a day of delay, so anchoring on
     today would ask for a period that does not exist yet on the first day of a
-    month or year.
+    month or year. Alexela's periods follow Latvian time, whatever time zone
+    Home Assistant itself runs in.
     """
-    return dt_util.now() - DATA_LAG
+    return datetime.now(ZoneInfo(PORTAL_TIME_ZONE)) - DATA_LAG
 
 
 def unwrap_payload(payload: Any) -> dict[str, Any]:

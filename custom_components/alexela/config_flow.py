@@ -9,7 +9,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import aiohttp_client, selector
 
 from .api import (
@@ -18,7 +18,13 @@ from .api import (
     AlexelaConnectionError,
     normalize_token,
 )
-from .const import CONF_CRM_ID, CONF_TOKEN, DOMAIN
+from .const import (
+    BILL_DEFAULTS,
+    CONF_BILL_CONNECTION_AMPS,
+    CONF_CRM_ID,
+    CONF_TOKEN,
+    DOMAIN,
+)
 
 
 def _schema(*, crm_id: str | None = None, token_only: bool = False) -> vol.Schema:
@@ -28,6 +34,21 @@ def _schema(*, crm_id: str | None = None, token_only: bool = False) -> vol.Schem
     fields[vol.Required(CONF_TOKEN)] = selector.TextSelector(
         selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
     )
+    return vol.Schema(fields)
+
+
+def _bill_schema() -> vol.Schema:
+    """Tariff fields for the bill estimate, all excl VAT."""
+    fields: dict[Any, Any] = {}
+    for key in BILL_DEFAULTS:
+        integer = key == CONF_BILL_CONNECTION_AMPS
+        fields[vol.Required(key)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1 if integer else 0,
+                step=1 if integer else "any",
+                mode=selector.NumberSelectorMode.BOX,
+            )
+        )
     return vol.Schema(fields)
 
 
@@ -44,6 +65,14 @@ class AlexelaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle an Alexela config flow."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> AlexelaOptionsFlow:
+        """Return the bill tariff options flow."""
+        return AlexelaOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -111,4 +140,21 @@ class AlexelaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm",
             data_schema=_schema(token_only=True),
             errors=errors,
+        )
+
+
+class AlexelaOptionsFlow(config_entries.OptionsFlowWithReload):
+    """Set the tariff the bill estimate uses."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Edit the bill estimate tariff."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                _bill_schema(), {**BILL_DEFAULTS, **self.config_entry.options}
+            ),
         )

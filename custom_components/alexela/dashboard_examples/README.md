@@ -56,8 +56,9 @@ recorded month's invoice total. It takes Alexela's energy cost (fixed price incl
 VAT), fills unrecorded days at the month's daily average, and adds the other
 invoice lines plus 21% VAT: distribution 0.03962 EUR/kWh, balancing capacity
 0.00201 EUR/kWh, capacity maintenance 0.34 EUR/A for 20 A, and the 1.24 EUR
-monthly fee (all excl VAT, from 2026 PAMATA-1 1F invoices). Adjust the
-`BILL_*` constants in `const.py` if your connection or tariffs differ. A
+monthly fee (all excl VAT, from 2026 PAMATA-1 1F invoices). If your connection
+or tariffs differ, set them under **Settings → Devices & services → Alexela →
+Configure**. A
 partial first contract month, which Alexela prorates, is not modelled.
 
 ## Unpaid bills
