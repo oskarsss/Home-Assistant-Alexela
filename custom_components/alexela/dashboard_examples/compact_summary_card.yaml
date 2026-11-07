@@ -6,17 +6,19 @@ columns: 2
 square: false
 cards:
   - type: tile
+    entity: sensor.alexela_electricity_estimated_bill_this_month
+    name: Estimated final bill · this month
+    icon: mdi:receipt-text-clock-outline
+    state_content:
+      - estimate_range
+  - type: tile
     entity: sensor.alexela_electricity_consumption_this_month
-    name: Usage · this month
+    name: Consumption · this month
     icon: mdi:meter-electric
   - type: tile
     entity: sensor.alexela_electricity_cost_this_month
-    name: Cost · this month
+    name: Consumption cost · this month
     icon: mdi:cash
-  - type: tile
-    entity: sensor.alexela_electricity_estimated_bill_this_month
-    name: Estimated bill · this month
-    icon: mdi:receipt-text-clock-outline
   - type: tile
     entity: sensor.alexela_electricity_price_this_month
     name: Effective price · this month

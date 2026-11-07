@@ -61,6 +61,11 @@ or tariffs differ, set them under **Settings → Devices & services → Alexela 
 Configure**. A
 partial first contract month, which Alexela prorates, is not modelled.
 
+The `estimate_range` attribute (for example `€27–31`), which the dashboard tile
+shows, brackets the unrecorded days between the lower and higher of the month's
+and the last 30 days' daily average, widened by the usual day-to-day spread. It
+narrows as the month fills in.
+
 ## Unpaid bills
 
 `unpaid_bills_card.yaml` displays unpaid amounts and payment deadlines using the

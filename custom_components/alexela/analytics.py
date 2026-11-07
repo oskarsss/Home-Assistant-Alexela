@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import calendar
 from collections.abc import Sequence
+import math
+import statistics
 from datetime import date, datetime, timedelta, tzinfo
 from typing import Any
 
@@ -222,6 +224,7 @@ def estimate_month_bill(
     capacity_fee: float,
     network_eur_per_kwh: float,
     vat_multiplier: float,
+    recent_daily_energy: Sequence[float] = (),
 ) -> dict[str, Any] | None:
     """Project the latest month's invoice total from its recorded days.
 
@@ -229,6 +232,10 @@ def estimate_month_bill(
     adds per-kWh network charges plus monthly fees, all quoted excl VAT, so VAT
     is applied to those parts only. Unrecorded days are filled at the month's
     recorded daily average.
+
+    The range fills them at the lower and higher of that average and the
+    recent daily average, widened by the recent day-to-day spread over the
+    remaining days. It closes as the month fills in.
     """
     if not daily_energy:
         return None
@@ -244,6 +251,37 @@ def estimate_month_bill(
 
     projected_kwh = recorded_kwh * scale
     projected_energy_cost = recorded_energy_cost * scale
+
+    remaining_days = days_in_month - len(daily_energy)
+    averages = [recorded_kwh / len(daily_energy)]
+    if recent_daily_energy:
+        averages.append(statistics.fmean(recent_daily_energy))
+    spread = (
+        statistics.pstdev(recent_daily_energy) * math.sqrt(remaining_days)
+        if len(recent_daily_energy) > 1
+        else 0.0
+    )
+
+    def bill_for_remaining(kwh: float) -> float:
+        kwh = max(kwh, 0.0)
+        unit_price = recorded_energy_cost / recorded_kwh
+        return bill(
+            recorded_kwh + kwh, recorded_energy_cost + kwh * unit_price
+        )
+
+    # Without recorded kWh there is no energy price to apply to the rest.
+    bill_range = (
+        {
+            "projected_bill_low": bill_for_remaining(
+                remaining_days * min(averages) - spread
+            ),
+            "projected_bill_high": bill_for_remaining(
+                remaining_days * max(averages) + spread
+            ),
+        }
+        if recorded_kwh > 0
+        else {}
+    )
     return {
         "month": month_start.strftime("%B %Y"),
         "recorded_days": len(daily_energy),
@@ -255,4 +293,5 @@ def estimate_month_bill(
         "projected_network_cost": projected_kwh * network_eur_per_kwh * vat_multiplier,
         "projected_fixed_fees": (monthly_fee + capacity_fee) * vat_multiplier,
         "projected_bill": bill(projected_kwh, projected_energy_cost),
+        **bill_range,
     }

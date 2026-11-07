@@ -546,6 +546,12 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
                 return None
             return {
                 **estimate,
+                "estimate_range": (
+                    f"€{estimate['projected_bill_low']:.0f}–"
+                    f"{estimate['projected_bill_high']:.0f}"
+                    if "projected_bill_low" in estimate
+                    else f"€{estimate['projected_bill']:.2f}"
+                ),
                 "estimate_label": (
                     f"{estimate['month']} · {estimate['recorded_days']}/"
                     f"{estimate['days_in_month']} days recorded"
@@ -553,7 +559,9 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
                 "estimate_basis": (
                     "Alexela energy cost plus distribution, balancing, "
                     "capacity and monthly fees incl 21% VAT; unrecorded days "
-                    "use the month's daily average"
+                    "use the month's daily average. The range uses the lower "
+                    "and higher of that and the last 30 days' average, plus "
+                    "their day-to-day spread"
                 ),
             }
         if self.entity_description.key == "electricity_15_minute_history":

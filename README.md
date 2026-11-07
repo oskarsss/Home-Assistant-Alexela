@@ -71,6 +71,9 @@ Entity IDs may differ if you have renamed entities or HA added a suffix.
 
 ## Latest updates
 
+- Estimated final bill shows a likely range (v0.3.23), for example `€27–31`,
+  that narrows as the month's days are recorded; the dashboard example puts the
+  bill first and labels the other tiles as consumption.
 - Fewer requests and steadier statistics (v0.3.22): the 30-day reconciliation
   of late Alexela revisions now runs every 6 hours instead of every 15-minute
   poll (ordinary polls re-read the latest 2 days), a run that pauses partway no

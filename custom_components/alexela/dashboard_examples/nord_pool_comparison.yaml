@@ -75,14 +75,36 @@ views:
             content: >-
               {{ state_attr('sensor.alexela_electricity_unpaid_bills', 'message') or '' }}
           - type: heading
-            heading: Cost
+            heading: Bill & consumption
             heading_style: title
             icon: mdi:cash-multiple
           - type: tile
             grid_options:
               columns: 12
+            entity: sensor.alexela_electricity_estimated_bill_this_month
+            name: Estimated final bill
+            icon: mdi:receipt-text-clock-outline
+            state_content:
+              - estimate_range
+              - estimate_label
+            vertical: false
+            features_position: bottom
+          - type: tile
+            grid_options:
+              columns: 12
+            entity: sensor.alexela_electricity_consumption_this_month
+            name: Consumption this month
+            icon: mdi:meter-electric
+            state_content:
+              - state
+              - average_period_label
+            vertical: false
+            features_position: bottom
+          - type: tile
+            grid_options:
+              columns: 12
             entity: sensor.alexela_electricity_cost_this_month
-            name: Cost this month
+            name: Consumption cost this month
             icon: mdi:calendar-month
             state_content:
               - state
@@ -92,31 +114,9 @@ views:
           - type: tile
             grid_options:
               columns: 12
-            entity: sensor.alexela_electricity_estimated_bill_this_month
-            name: Estimated bill
-            icon: mdi:receipt-text-clock-outline
-            state_content:
-              - state
-              - estimate_label
-            vertical: false
-            features_position: bottom
-          - type: tile
-            grid_options:
-              columns: 12
             entity: sensor.alexela_electricity_cost_last_7_available_days
-            name: Cost last 7 days
+            name: Consumption cost last 7 days
             icon: mdi:calendar-week
-            state_content:
-              - state
-              - average_period_label
-            vertical: false
-            features_position: bottom
-          - type: tile
-            grid_options:
-              columns: 12
-            entity: sensor.alexela_electricity_consumption_this_month
-            name: Usage this month
-            icon: mdi:meter-electric
             state_content:
               - state
               - average_period_label

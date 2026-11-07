@@ -334,6 +334,41 @@ class EstimateMonthBillTest(unittest.TestCase):
         )
         self.assertLess(result["recorded_bill"], result["projected_bill"])
 
+    def test_range_brackets_estimate_and_uses_recent_average(self):
+        recent = [3.0, 5.0] * 15
+
+        result = estimate_month_bill(
+            date(2026, 11, 1), [3.4] * 5, [0.425] * 5,
+            recent_daily_energy=recent, **self.TARIFF,
+        )
+
+        self.assertLess(result["projected_bill_low"], result["projected_bill"])
+        self.assertGreater(result["projected_bill_high"], result["projected_bill"])
+        # High end: 25 days at the recent 4.0 kWh/day plus 1.0 kWh x sqrt(25).
+        kwh = 17.0 + 25 * 4.0 + 5.0
+        self.assertAlmostEqual(
+            result["projected_bill_high"],
+            0.125 * kwh + (1.24 + 6.8 + kwh * 0.04163) * 1.21,
+        )
+
+    def test_complete_month_has_no_range(self):
+        result = estimate_month_bill(
+            date(2026, 10, 1), [4.0] * 31, [0.5] * 31,
+            recent_daily_energy=[1.0, 9.0], **self.TARIFF,
+        )
+
+        self.assertAlmostEqual(result["projected_bill_low"], result["projected_bill"])
+        self.assertAlmostEqual(result["projected_bill_high"], result["projected_bill"])
+
+    def test_month_without_recorded_kwh_has_no_range(self):
+        result = estimate_month_bill(
+            date(2026, 11, 1), [0.0], [0.0],
+            recent_daily_energy=[4.0] * 30, **self.TARIFF,
+        )
+
+        self.assertNotIn("projected_bill_low", result)
+        self.assertNotIn("projected_bill_high", result)
+
     def test_no_recorded_days_has_no_estimate(self):
         self.assertIsNone(
             estimate_month_bill(date(2026, 11, 1), [], [], **self.TARIFF)

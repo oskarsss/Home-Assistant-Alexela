@@ -1076,6 +1076,7 @@ class AlexelaStatisticsImporter:
                     + float(self.bill[CONF_BILL_BALANCING_EUR_PER_KWH])
                 ),
                 vat_multiplier=LATVIA_VAT_MULTIPLIER,
+                recent_daily_energy=[value for _, value in daily_energy[-30:]],
             )
             if latest_day
             else None
