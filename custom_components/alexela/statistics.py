@@ -1034,6 +1034,15 @@ class AlexelaStatisticsImporter:
             ),
             "last_seven_cost": sum(last_seven_cost) if last_seven_cost else None,
             "bill_estimate": bill_estimate,
+            # Alexela's yearly view sometimes drops the current month's row,
+            # so the month sensors fall back to these daily-statistics totals.
+            "latest_month_start": (
+                f"{latest_month[0]:04d}-{latest_month[1]:02d}-01T00:00:00"
+                if latest_month
+                else None
+            ),
+            "latest_month_kwh": sum(month_energy) if month_energy else None,
+            "latest_month_cost": sum(month_cost) if month_cost else None,
             "last_seven_daily_cost_average": (
                 sum(last_seven_cost) / len(last_seven_cost)
                 if last_seven_cost
@@ -1092,11 +1101,14 @@ class AlexelaStatisticsImporter:
             if imported_through is not None
             else None
         )
-        months = [
+        months = {
             timestamp.date()
             for row in block_rows(total_block(year_payload))
             if (timestamp := parse_timestamp(row.get("timestamp"), zone)) is not None
-        ]
+        }
+        # The yearly view has dropped the current month's row for days while
+        # its daily data kept arriving, so always scan the current month.
+        months.add(newest.replace(day=1))
 
         days: list[date] = []
         for month in sorted(months):

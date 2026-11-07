@@ -71,6 +71,9 @@ Entity IDs may differ if you have renamed entities or HA added a suffix.
 
 ## Latest updates
 
+- This-month and year-to-date sensors no longer fall back to the previous
+  month when Alexela's yearly view temporarily omits the current month
+  (v0.3.21): they use the month's daily statistics instead.
 - New `Electricity estimated bill this month` sensor (v0.3.20): projects the
   month's invoice total from Alexela's energy cost plus distribution,
   balancing, capacity and monthly fees incl 21% VAT, filling unrecorded days

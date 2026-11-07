@@ -39,7 +39,43 @@ def _invoice_due_date(data: dict[str, Any]) -> date | None:
     return date.fromisoformat(value) if value else None
 
 
+def _statistics_month(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the newest month of imported daily statistics as a yearly row."""
+    summary = data.get(NORD_POOL_SUMMARY_KEY)
+    if not isinstance(summary, dict) or summary.get("latest_month_kwh") is None:
+        return None
+    return {
+        "timestamp": summary.get("latest_month_start"),
+        "amount": summary["latest_month_kwh"],
+        "priceWithVat": summary.get("latest_month_cost"),
+    }
+
+
+def _unlisted_month(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the statistics month when Alexela's yearly view lacks it.
+
+    Alexela's yearly view has dropped the current month's row for days at a
+    time while the daily data kept arriving, which made "this month" fall back
+    to the previous month.
+    """
+    month = _statistics_month(data)
+    timestamp = month.get("timestamp") if month else None
+    if not isinstance(timestamp, str):
+        return None
+    if timestamp > reference_datetime().strftime("%Y-%m-01T00:00:00"):
+        return None
+    listed = _listed_period_block(data)
+    if listed and listed["timestamp"] >= timestamp:
+        return None
+    return month
+
+
 def _period_block(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the aggregate row for the latest month with data."""
+    return _unlisted_month(data) or _listed_period_block(data)
+
+
+def _listed_period_block(data: dict[str, Any]) -> dict[str, Any] | None:
     """Return the aggregate row for the latest month Alexela has data for.
 
     Alexela is roughly a day behind and occasionally skips a period, so the row
@@ -76,13 +112,30 @@ def _period_start(data: dict[str, Any]) -> datetime | None:
     return parsed
 
 
+def _with_unlisted_month(
+    data: dict[str, Any], value: float | None, key: str
+) -> float | None:
+    """Add the month missing from Alexela's yearly view to a yearly total."""
+    month = _unlisted_month(data)
+    listed = _listed_period_block(data)
+    extra = month.get(key) if month else None
+    if extra is None:
+        return value
+    if listed and listed["timestamp"][:4] != month["timestamp"][:4]:
+        # The month opens a new year, so last year's total no longer counts.
+        return float(extra)
+    return (value or 0.0) + float(extra)
+
+
 def _ytd_energy(data: dict[str, Any]) -> float | None:
     total = total_block(data)
     value = total.get("totalAmount") if total else None
     if value is None:
         # A non-aggregate block has no yearly total; add the months up instead.
-        return sum_rows(total, "amount")
-    return float(value)
+        value = sum_rows(total, "amount")
+    return _with_unlisted_month(
+        data, float(value) if value is not None else None, "amount"
+    )
 
 
 def _month_energy(data: dict[str, Any]) -> float | None:
@@ -95,8 +148,10 @@ def _ytd_cost(data: dict[str, Any]) -> float | None:
     total = total_block(data)
     value = total.get("totalPriceWithVat") if total else None
     if value is None:
-        return sum_rows(total, "priceWithVat")
-    return float(value)
+        value = sum_rows(total, "priceWithVat")
+    return _with_unlisted_month(
+        data, float(value) if value is not None else None, "priceWithVat"
+    )
 
 
 def _month_cost(data: dict[str, Any]) -> float | None:
