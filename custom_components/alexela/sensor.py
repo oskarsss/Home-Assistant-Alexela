@@ -137,6 +137,18 @@ def _absolute(value: float | None) -> float | None:
     return abs(value) if value is not None else None
 
 
+def _bill_estimate(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the projected invoice for the latest recorded month."""
+    summary = data.get(NORD_POOL_SUMMARY_KEY)
+    estimate = summary.get("bill_estimate") if isinstance(summary, dict) else None
+    return estimate if isinstance(estimate, dict) else None
+
+
+def _projected_bill(data: dict[str, Any]) -> float | None:
+    estimate = _bill_estimate(data)
+    return float(estimate["projected_bill"]) if estimate else None
+
+
 def _latest_day_energy(data: dict[str, Any]) -> float | None:
     """Return consumption for Alexela's latest available day."""
     return _nord_pool_summary_value(data, "latest_day_kwh")
@@ -157,7 +169,12 @@ INVOICE_SENSOR_KEYS = frozenset(
 # Values named after the current month or year. A stale cache must not show
 # an earlier month's total as "this month".
 MONTH_SENSOR_KEYS = frozenset(
-    {"electricity_month", "electricity_cost_month", "electricity_price_month"}
+    {
+        "electricity_month",
+        "electricity_cost_month",
+        "electricity_price_month",
+        "electricity_bill_estimate",
+    }
 )
 YEAR_SENSOR_KEYS = frozenset({"electricity_ytd", "electricity_cost_ytd"})
 
@@ -257,6 +274,15 @@ SENSORS: tuple[AlexelaSensorDescription, ...] = (
         native_unit_of_measurement="EUR",
         suggested_display_precision=2,
         value_fn=_last_seven_cost,
+    ),
+    AlexelaSensorDescription(
+        key="electricity_bill_estimate",
+        name="Electricity estimated bill this month",
+        icon="mdi:receipt-text-clock-outline",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="EUR",
+        suggested_display_precision=2,
+        value_fn=_projected_bill,
     ),
     AlexelaSensorDescription(
         key="electricity_15_minute_history",
@@ -452,6 +478,22 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
             if period is not None:
                 attributes["data_period_start"] = period.isoformat()
             return attributes
+        if self.entity_description.key == "electricity_bill_estimate":
+            estimate = _bill_estimate(data)
+            if estimate is None:
+                return None
+            return {
+                **estimate,
+                "estimate_label": (
+                    f"{estimate['month']} · {estimate['recorded_days']}/"
+                    f"{estimate['days_in_month']} days recorded"
+                ),
+                "estimate_basis": (
+                    "Alexela energy cost plus distribution, balancing, "
+                    "capacity and monthly fees incl 21% VAT; unrecorded days "
+                    "use the month's daily average"
+                ),
+            }
         if self.entity_description.key == "electricity_15_minute_history":
             if not isinstance(summary, dict):
                 return None

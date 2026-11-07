@@ -31,6 +31,15 @@ LATVIA_VAT_MULTIPLIER = 1.21
 # comparison reference.
 PROVIDER_MARKUP_EUR_PER_KWH = 0.0087
 
+# Invoice charges besides the energy itself, all excl VAT, as itemised on
+# 2026 bills for a PAMATA-1 1F connection. Used only for the bill estimate.
+BILL_MONTHLY_FEE_EUR = 1.24
+BILL_CAPACITY_EUR_PER_AMP = 0.34
+BILL_CONNECTION_AMPS = 20
+BILL_DISTRIBUTION_EUR_PER_KWH = 0.03962
+# Balancing capacity varies monthly (0.00122-0.00201 so far); use the latest.
+BILL_BALANCING_EUR_PER_KWH = 0.00201
+
 # Alexela JWTs observed in August 2026 are short-lived and can be rotated by
 # /login/refreshJwt. Poll often enough to refresh well before token expiry.
 UPDATE_INTERVAL = timedelta(minutes=15)

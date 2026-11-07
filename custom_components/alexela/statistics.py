@@ -30,6 +30,7 @@ from .analytics import (
     completed_month_average,
     completed_week_average,
     constant_daily_average,
+    estimate_month_bill,
     monthly_daily_profile,
     recorded_month_records,
     recorded_month_totals,
@@ -37,7 +38,13 @@ from .analytics import (
     typical_hourly_profile,
 )
 from .const import (
+    BILL_BALANCING_EUR_PER_KWH,
+    BILL_CAPACITY_EUR_PER_AMP,
+    BILL_CONNECTION_AMPS,
+    BILL_DISTRIBUTION_EUR_PER_KWH,
+    BILL_MONTHLY_FEE_EUR,
     DOMAIN,
+    LATVIA_VAT_MULTIPLIER,
     NORD_POOL_INITIAL_BACKFILL_DAYS,
     PORTAL_TIME_ZONE,
     RECONCILE_DAYS,
@@ -965,6 +972,21 @@ class AlexelaStatisticsImporter:
             == latest_month
         ]
         last_seven_cost = [value for _, value in daily_cost[-7:]]
+        bill_estimate = (
+            estimate_month_bill(
+                latest_day[0].astimezone(zone).date().replace(day=1),
+                month_energy,
+                month_cost,
+                monthly_fee=BILL_MONTHLY_FEE_EUR,
+                capacity_fee=BILL_CAPACITY_EUR_PER_AMP * BILL_CONNECTION_AMPS,
+                network_eur_per_kwh=(
+                    BILL_DISTRIBUTION_EUR_PER_KWH + BILL_BALANCING_EUR_PER_KWH
+                ),
+                vat_multiplier=LATVIA_VAT_MULTIPLIER,
+            )
+            if latest_day
+            else None
+        )
         month_records = recorded_month_records(daily_energy, zone)
         complete_month_records = [
             item for item in month_records if item["complete"]
@@ -1011,6 +1033,7 @@ class AlexelaStatisticsImporter:
                 sum(month_cost) / len(month_cost) if month_cost else None
             ),
             "last_seven_cost": sum(last_seven_cost) if last_seven_cost else None,
+            "bill_estimate": bill_estimate,
             "last_seven_daily_cost_average": (
                 sum(last_seven_cost) / len(last_seven_cost)
                 if last_seven_cost

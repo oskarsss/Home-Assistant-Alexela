@@ -8,7 +8,7 @@ alter an existing Home Assistant dashboard automatically.
 `nord_pool_comparison.yaml` is a responsive, two-view dashboard based on the
 current Home Assistant `sections` layout:
 
-- **Overview** — current-month and seven-day totals with matching period-total averages, a
+- **Overview** — an estimated month-end bill, current-month and seven-day totals with matching period-total averages, a
   native 15-minute chart for the latest available 48 hours with an all-history
   weekday/time-band profile, a 30-day daily-usage chart with the matching
   all-history calendar-month daily average, a same-period
@@ -44,9 +44,21 @@ statistics. Every referenced external statistic is created by this integration.
 ## Compact summary
 
 `compact_summary_card.yaml` is a responsive two-column tile grid containing
-current-month usage, current-month cost, the month's effective fixed price, and
-the latest matched Nord Pool spot price. Paste it into a manual card's YAML
-editor and adjust locally renamed sensor entity IDs if necessary.
+current-month usage, current-month cost, the estimated month-end bill, the
+month's effective fixed price, and the latest matched Nord Pool spot price.
+Paste it into a manual card's YAML editor and adjust locally renamed sensor
+entity IDs if necessary.
+
+## Estimated bill
+
+`sensor.alexela_electricity_estimated_bill_this_month` projects the latest
+recorded month's invoice total. It takes Alexela's energy cost (fixed price incl
+VAT), fills unrecorded days at the month's daily average, and adds the other
+invoice lines plus 21% VAT: distribution 0.03962 EUR/kWh, balancing capacity
+0.00201 EUR/kWh, capacity maintenance 0.34 EUR/A for 20 A, and the 1.24 EUR
+monthly fee (all excl VAT, from 2026 PAMATA-1 1F invoices). Adjust the
+`BILL_*` constants in `const.py` if your connection or tariffs differ. A
+partial first contract month, which Alexela prorates, is not modelled.
 
 ## Unpaid bills
 

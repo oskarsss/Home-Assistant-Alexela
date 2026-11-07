@@ -19,6 +19,7 @@ align_hourly_profile_to_intervals = ANALYTICS.align_hourly_profile_to_intervals
 completed_month_average = ANALYTICS.completed_month_average
 completed_week_average = ANALYTICS.completed_week_average
 constant_daily_average = ANALYTICS.constant_daily_average
+estimate_month_bill = ANALYTICS.estimate_month_bill
 monthly_daily_profile = ANALYTICS.monthly_daily_profile
 recorded_month_totals = ANALYTICS.recorded_month_totals
 recorded_month_records = ANALYTICS.recorded_month_records
@@ -280,6 +281,43 @@ class RollingImportDaysTest(unittest.TestCase):
 
         self.assertEqual(result[0], date(2026, 8, 10))
         self.assertEqual(result, published)
+
+
+class EstimateMonthBillTest(unittest.TestCase):
+    TARIFF = {
+        "monthly_fee": 1.24,
+        "capacity_fee": 0.34 * 20,
+        "network_eur_per_kwh": 0.03962 + 0.00201,
+        "vat_multiplier": 1.21,
+    }
+
+    def test_full_month_matches_october_2026_invoice(self):
+        kwh = [120.62 / 31] * 31
+        cost = [value * 0.12499 for value in kwh]
+
+        result = estimate_month_bill(date(2026, 10, 1), kwh, cost, **self.TARIFF)
+
+        self.assertAlmostEqual(result["projected_bill"], 30.88, places=2)
+        self.assertAlmostEqual(result["projected_kwh"], 120.62)
+        self.assertEqual(result["recorded_days"], 31)
+
+    def test_partial_month_scales_usage_but_not_fixed_fees(self):
+        result = estimate_month_bill(
+            date(2026, 11, 1), [4.0] * 6, [0.5] * 6, **self.TARIFF
+        )
+
+        self.assertAlmostEqual(result["projected_kwh"], 120.0)
+        self.assertAlmostEqual(result["projected_energy_cost"], 15.0)
+        self.assertAlmostEqual(
+            result["projected_bill"],
+            15.0 + (1.24 + 6.8 + 120.0 * 0.04163) * 1.21,
+        )
+        self.assertLess(result["recorded_bill"], result["projected_bill"])
+
+    def test_no_recorded_days_has_no_estimate(self):
+        self.assertIsNone(
+            estimate_month_bill(date(2026, 11, 1), [], [], **self.TARIFF)
+        )
 
 
 if __name__ == "__main__":

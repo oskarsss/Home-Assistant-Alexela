@@ -15,6 +15,7 @@ Unofficial Home Assistant custom integration for electricity consumption data fr
   - Electricity consumption this month (`kWh`)
   - Electricity cost YTD (`EUR`)
   - Electricity cost this month (`EUR`)
+  - Electricity estimated bill this month (`EUR`): projected invoice total incl network fees and VAT
   - Electricity price this month (`EUR/kWh`)
   - Latest matched Nord Pool Latvia price incl. VAT (`EUR/kWh`)
   - Nord Pool plus provider-markup reference cost (`EUR`)
@@ -70,6 +71,11 @@ Entity IDs may differ if you have renamed entities or HA added a suffix.
 
 ## Latest updates
 
+- New `Electricity estimated bill this month` sensor (v0.3.20): projects the
+  month's invoice total from Alexela's energy cost plus distribution,
+  balancing, capacity and monthly fees incl 21% VAT, filling unrecorded days
+  at the month's daily average. The dashboard examples show it next to
+  "Cost this month". Tariffs are the `BILL_*` constants in `const.py`.
 - Expired tokens no longer blank the dashboard (v0.3.19). The last
   successfully received consumption data, including the 15-minute and daily
   chart data, is saved to disk. It loads at startup and stays visible while

@@ -193,3 +193,48 @@ def rolling_import_days(
     reconcile_start = newest - timedelta(days=reconcile_days - 1)
     recent = [day for day in available if day >= reconcile_start]
     return sorted(set(pending) | set(recent))
+
+
+def estimate_month_bill(
+    month_start: date,
+    daily_energy: Sequence[float],
+    daily_cost: Sequence[float],
+    *,
+    monthly_fee: float,
+    capacity_fee: float,
+    network_eur_per_kwh: float,
+    vat_multiplier: float,
+) -> dict[str, Any] | None:
+    """Project the latest month's invoice total from its recorded days.
+
+    Alexela's own cost already holds the fixed energy price incl VAT. The bill
+    adds per-kWh network charges plus monthly fees, all quoted excl VAT, so VAT
+    is applied to those parts only. Unrecorded days are filled at the month's
+    recorded daily average.
+    """
+    if not daily_energy:
+        return None
+
+    days_in_month = calendar.monthrange(month_start.year, month_start.month)[1]
+    scale = days_in_month / len(daily_energy)
+    recorded_kwh = sum(daily_energy)
+    recorded_energy_cost = sum(daily_cost)
+
+    def bill(kwh: float, energy_cost: float) -> float:
+        fees = monthly_fee + capacity_fee + kwh * network_eur_per_kwh
+        return energy_cost + fees * vat_multiplier
+
+    projected_kwh = recorded_kwh * scale
+    projected_energy_cost = recorded_energy_cost * scale
+    return {
+        "month": month_start.strftime("%B %Y"),
+        "recorded_days": len(daily_energy),
+        "days_in_month": days_in_month,
+        "recorded_kwh": recorded_kwh,
+        "recorded_bill": bill(recorded_kwh, recorded_energy_cost),
+        "projected_kwh": projected_kwh,
+        "projected_energy_cost": projected_energy_cost,
+        "projected_network_cost": projected_kwh * network_eur_per_kwh * vat_multiplier,
+        "projected_fixed_fees": (monthly_fee + capacity_fee) * vat_multiplier,
+        "projected_bill": bill(projected_kwh, projected_energy_cost),
+    }

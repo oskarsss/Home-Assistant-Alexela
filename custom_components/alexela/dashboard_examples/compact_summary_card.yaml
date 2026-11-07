@@ -14,6 +14,10 @@ cards:
     name: Cost · this month
     icon: mdi:cash
   - type: tile
+    entity: sensor.alexela_electricity_estimated_bill_this_month
+    name: Estimated bill · this month
+    icon: mdi:receipt-text-clock-outline
+  - type: tile
     entity: sensor.alexela_electricity_price_this_month
     name: Effective price · this month
     icon: mdi:shield-check
