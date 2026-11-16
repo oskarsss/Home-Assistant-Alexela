@@ -378,8 +378,8 @@ views:
               action: navigate
               navigation_path: /alexela-energy/monthly-history
             grid_options:
-              columns: 4
-              rows: 2
+              columns: 12
+              rows: 1
           - type: tile
             entity: sensor.alexela_minimum_recorded_month
             name: Minimum month
@@ -391,8 +391,8 @@ views:
               action: navigate
               navigation_path: /alexela-energy/monthly-lowest
             grid_options:
-              columns: 4
-              rows: 2
+              columns: 12
+              rows: 1
           - type: tile
             entity: sensor.alexela_maximum_recorded_month
             name: Maximum month
@@ -404,8 +404,8 @@ views:
               action: navigate
               navigation_path: /alexela-energy/monthly-highest
             grid_options:
-              columns: 4
-              rows: 2
+              columns: 12
+              rows: 1
           - type: statistics-graph
             title: Monthly consumption · 24 months
             entities:
@@ -458,70 +458,46 @@ views:
       - type: grid
         cards:
           - type: heading
-            heading: Historical cost
+            heading: Bills
             heading_style: title
-            icon: mdi:cash-clock
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
-            name: This month
+            icon: mdi:receipt-text-outline
+          - type: entity
+            entity: sensor.alexela_electricity_estimated_bill_this_month
+            name: This month (est.)
             icon: mdi:calendar-month
-            unit: EUR
-            stat_type: change
-            period:
-              calendar:
-                period: month
             grid_options:
               columns: 6
               rows: 2
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
-            name: Previous month
-            icon: mdi:calendar-arrow-left
-            unit: EUR
-            stat_type: change
-            period:
-              calendar:
-                period: month
-                offset: -1
+          - type: entity
+            entity: sensor.alexela_electricity_last_bill
+            name: Last bill
+            icon: mdi:receipt-text-check-outline
             grid_options:
               columns: 6
               rows: 2
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
-            name: This year
-            icon: mdi:calendar
-            unit: EUR
-            stat_type: change
-            period:
-              calendar:
-                period: year
+          - type: entity
+            entity: sensor.alexela_electricity_unpaid_amount
+            name: Unpaid
+            icon: mdi:cash-clock
             grid_options:
-              columns: 6
-              rows: 2
-          - type: statistic
-            entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
-            name: Previous year
-            icon: mdi:calendar-arrow-left
-            unit: EUR
-            stat_type: change
-            period:
-              calendar:
-                period: year
-                offset: -1
-            grid_options:
-              columns: 6
+              columns: 12
               rows: 2
           - type: custom:apexcharts-card
-            graph_span: 3y
+            graph_span: 12month
+            stacked: true
             span:
               end: month
             header:
               show: true
-              title: Invoiced bills · 36 months
+              title: Bills · 12 months
               show_states: false
             apex_config:
               chart:
                 height: 380
+              plotOptions:
+                bar:
+                  columnWidth: 60%
+                  borderRadius: 3
               yaxis:
                 min: 0
                 decimalsInFloat: 2
@@ -543,14 +519,34 @@ views:
                       return t >= start.getTime() && t <= end.getTime();
                     })
                     .map((bill) => [new Date(bill.start).getTime(), bill.amount]);
+              - entity: sensor.alexela_electricity_estimated_bill_this_month
+                name: Estimate
+                type: column
+                color: "#f4b49a"
+                unit: EUR
+                float_precision: 2
+                show:
+                  legend_value: false
+                data_generator: |
+                  const months = ["January", "February", "March", "April", "May", "June",
+                    "July", "August", "September", "October", "November", "December"];
+                  const [name, year] = (entity.attributes.month || "").split(" ");
+                  const index = months.indexOf(name);
+                  if (index < 0 || !year) return [];
+                  const key = `${year}-${String(index + 1).padStart(2, "0")}`;
+                  const bills = hass.states["sensor.alexela_electricity_last_bill"]?.attributes.bill_history || [];
+                  if (bills.some((bill) => bill.month === key)) return [];
+                  const value = Number(entity.state);
+                  if (!Number.isFinite(value)) return [];
+                  return [[new Date(`${key}-01`).getTime(), value]];
             grid_options:
               columns: full
               rows: 7
           - type: statistics-graph
-            title: Monthly fixed cost · 24 months
+            title: Energy cost only · 24 months
             entities:
               - entity: alexela:REPLACE_WITH_CRM_ID_electricity_cost
-                name: Fixed cost
+                name: Energy cost
                 color: "#eb6834"
             days_to_show: 730
             chart_type: bar
