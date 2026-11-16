@@ -42,6 +42,21 @@ class InvoiceTests(unittest.TestCase):
         self.assertEqual(result["last_bill_amount"], 25.0)
         self.assertEqual(result["unpaid_count"], 0)
 
+    def test_billed_in_year_sums_only_that_years_months(self):
+        history = invoices.bill_history([
+            {"number": "dec", "sum": 40.1, "periodStart": "2025-12-01"},
+            {"number": "aug", "sum": 21.42, "periodStart": "2026-08-01"},
+            {"number": "sep", "sum": 29.21, "periodStart": "2026-09-01"},
+            {"number": "oct", "sum": 30.88, "periodStart": "2026-10-01"},
+            {"number": "credit", "sum": -0.1, "periodStart": "2026-10-01"},
+        ])
+        self.assertEqual(invoices.billed_in_year(history, 2026), 81.41)
+        self.assertEqual(invoices.billed_in_year(history, 2025), 40.1)
+        self.assertEqual(invoices.billed_in_year(history, 2027), 0.0)
+        self.assertEqual(invoices.billed_in_year([], 2026), 0.0)
+        tenths = [{"month": f"2026-0{m}", "amount": 0.1} for m in (1, 2, 3)]
+        self.assertEqual(invoices.billed_in_year(tenths, 2026), 0.3)
+
     def test_no_bills_leave_last_bill_unknown(self):
         result = invoices.summarize_invoices([], TODAY)
         self.assertEqual(result["bill_history"], [])
