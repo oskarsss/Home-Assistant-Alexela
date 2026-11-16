@@ -25,6 +25,28 @@ class InvoiceTests(unittest.TestCase):
         self.assertIn("due **2026-09-20**", result["message"])
         self.assertEqual(result["message"].count("21.42"), 1)
 
+    def test_bill_history_totals_every_invoice_by_month(self):
+        result = invoices.summarize_invoices([
+            {"number": "b", "unpaid": 0, "sum": "30.50", "periodStart": "2026-08-01T00:00:00"},
+            {"number": "a", "unpaid": 0, "sum": 25, "periodStart": "2026-07-01"},
+            {"number": "credit", "unpaid": 0, "sum": -5.5, "periodStart": "2026-08-01"},
+            {"number": "no-sum", "unpaid": 0, "periodStart": "2026-09-01"},
+            {"number": "no-period", "unpaid": 0, "sum": 9},
+            {"number": "nan", "unpaid": 0, "sum": "NaN", "periodStart": "2026-09-01"},
+        ], TODAY)
+        self.assertEqual(result["bill_history"], [
+            {"month": "2026-07", "start": "2026-07-01", "amount": 25.0, "bills": ["a"]},
+            {"month": "2026-08", "start": "2026-08-01", "amount": 25.0, "bills": ["b", "credit"]},
+        ])
+        self.assertEqual(result["last_bill_month"], "2026-08")
+        self.assertEqual(result["last_bill_amount"], 25.0)
+        self.assertEqual(result["unpaid_count"], 0)
+
+    def test_no_bills_leave_last_bill_unknown(self):
+        result = invoices.summarize_invoices([], TODAY)
+        self.assertEqual(result["bill_history"], [])
+        self.assertIsNone(result["last_bill_amount"])
+
     def test_partial_paid_credit_and_due_today(self):
         result = invoices.summarize_invoices([
             {"unpaid": "3.12", "sum": 100, "deadline": "2026-09-06"},

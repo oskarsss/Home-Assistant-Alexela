@@ -64,6 +64,7 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._invoice_store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.invoice_reminders")
         self._invoice_history: dict[str, Any] | None = None
         self._invoice_startup_pending = False
+        self._bill_history_warned = False
         self.statistics = AlexelaStatisticsImporter(
             hass,
             self.api,
@@ -93,6 +94,13 @@ class AlexelaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 INVOICE_PERIOD_START, today.isoformat()
             )
             data[INVOICE_SUMMARY_KEY] = summarize_invoices(items, today)
+            if items and not data[INVOICE_SUMMARY_KEY].get("bill_history"):
+                if not self._bill_history_warned:
+                    self._bill_history_warned = True
+                    _LOGGER.warning(
+                        "Alexela returned %d invoices but none had a readable "
+                        "sum and periodStart; bill history is empty", len(items)
+                    )
         except AlexelaAuthError as err:
             if not self._has_snapshot():
                 raise ConfigEntryAuthFailed(

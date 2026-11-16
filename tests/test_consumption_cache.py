@@ -71,6 +71,7 @@ def make(stored=None):
     client._last_valid = None
     client._last_valid_at = None
     client._snapshot_loaded = False
+    client._bill_history_warned = False
     client.auth_failed = False
     client._snapshot_store = SimpleNamespace(
         async_load=AsyncMock(return_value=stored), async_delay_save=Mock())

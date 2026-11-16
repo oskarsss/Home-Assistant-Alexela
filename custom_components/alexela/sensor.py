@@ -226,6 +226,7 @@ INVOICE_SENSOR_KEYS = frozenset(
         "electricity_unpaid_bills",
         "electricity_unpaid_amount",
         "electricity_next_bill_due_date",
+        "electricity_last_bill",
     }
 )
 # Values named after the current month or year. A stale cache must not show
@@ -284,6 +285,13 @@ SENSORS: tuple[AlexelaSensorDescription, ...] = (
         key="electricity_next_bill_due_date", name="Electricity next bill due date",
         device_class=SensorDeviceClass.DATE,
         value_fn=_invoice_due_date,
+    ),
+    AlexelaSensorDescription(
+        key="electricity_last_bill", name="Electricity last bill",
+        icon="mdi:receipt-text-outline",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="EUR", suggested_display_precision=2,
+        value_fn=lambda data: _invoice_value(data, "last_bill_amount"),
     ),
     AlexelaSensorDescription(
         key="electricity_ytd",
@@ -447,6 +455,7 @@ class AlexelaSensor(CoordinatorEntity[AlexelaCoordinator], SensorEntity):
             "average_basis",
             "months",
             "invoices",
+            "bill_history",
             "message",
             "last_successful_update",
         }

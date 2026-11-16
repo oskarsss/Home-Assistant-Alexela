@@ -511,6 +511,41 @@ views:
             grid_options:
               columns: 6
               rows: 2
+          - type: custom:apexcharts-card
+            graph_span: 3y
+            span:
+              end: month
+            header:
+              show: true
+              title: Invoiced bills · 36 months
+              show_states: false
+            apex_config:
+              chart:
+                height: 380
+              yaxis:
+                min: 0
+                decimalsInFloat: 2
+                title:
+                  text: EUR
+            series:
+              - entity: sensor.alexela_electricity_last_bill
+                name: Bill
+                type: column
+                color: "#eb6834"
+                unit: EUR
+                float_precision: 2
+                show:
+                  legend_value: false
+                data_generator: |
+                  return (entity.attributes.bill_history || [])
+                    .filter((bill) => {
+                      const t = new Date(bill.start).getTime();
+                      return t >= start.getTime() && t <= end.getTime();
+                    })
+                    .map((bill) => [new Date(bill.start).getTime(), bill.amount]);
+            grid_options:
+              columns: full
+              rows: 7
           - type: statistics-graph
             title: Monthly fixed cost · 24 months
             entities:

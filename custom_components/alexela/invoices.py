@@ -9,6 +9,35 @@ INVOICE_SUMMARY_KEY = "invoice_summary"
 INVOICE_PERIOD_START = "2000-01-01"
 
 
+def bill_history(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Total invoices by the month their period starts in.
+
+    Credit notes carry negative sums and net against that month.
+    """
+    months: dict[str, dict[str, Any]] = {}
+    for item in items:
+        try:
+            amount = Decimal(str(item["sum"]))
+            start = date.fromisoformat(str(item.get("periodStart") or "")[:10])
+        except (KeyError, InvalidOperation, ValueError):
+            continue
+        if not amount.is_finite():
+            continue
+        month = start.strftime("%Y-%m")
+        entry = months.setdefault(month, {"month": month, "amount": Decimal(0), "bills": []})
+        entry["amount"] += amount
+        entry["bills"].append(str(item.get("number") or "Unknown"))
+    return [
+        {
+            "month": month,
+            "start": f"{month}-01",
+            "amount": float(entry["amount"]),
+            "bills": sorted(entry["bills"]),
+        }
+        for month, entry in sorted(months.items())
+    ]
+
+
 def summarize_invoices(items: list[dict[str, Any]], today: date) -> dict[str, Any]:
     """Use the remaining balance, including partial payments and credit notes.
 
@@ -55,6 +84,7 @@ def summarize_invoices(items: list[dict[str, Any]], today: date) -> dict[str, An
         message = "\n\n".join(lines)
     else:
         message = "No unpaid electricity bills."
+    history = bill_history(items)
     return {
         "unpaid_count": len(unpaid),
         "unpaid_amount": float(total),
@@ -62,6 +92,9 @@ def summarize_invoices(items: list[dict[str, Any]], today: date) -> dict[str, An
         "overdue_count": sum(item["overdue"] for item in unpaid),
         "invoices": unpaid,
         "message": message,
+        "bill_history": history,
+        "last_bill_month": history[-1]["month"] if history else None,
+        "last_bill_amount": history[-1]["amount"] if history else None,
         "period_start": INVOICE_PERIOD_START,
         "period_end": today.isoformat(),
     }

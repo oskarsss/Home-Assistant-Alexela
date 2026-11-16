@@ -14,7 +14,8 @@ current Home Assistant `sections` layout:
   all-history calendar-month daily average, a same-period
   fixed-vs-Nord-Pool comparison, and clearly scoped price tiles.
 - **Analytics** — clearly separated Historical consumption, Historical cost,
-  Nord Pool comparison, and Nord Pool prices groups. Month-over-month and
+  Nord Pool comparison, and Nord Pool prices groups. Historical cost includes
+  a 36-month chart of actual invoiced bills by the month each invoice period starts in. Month-over-month and
   year-over-year statistic cards, plus monthly average/minimum/maximum cards,
   are paired with monthly, annual, daily, and cumulative graphs as history grows.
 

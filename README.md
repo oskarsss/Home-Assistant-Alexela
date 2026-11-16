@@ -42,6 +42,11 @@ fetching all pages from 2000-01-01 through today in Europe/Riga. It provides:
 - `sensor.alexela_electricity_unpaid_amount`: remaining amount in EUR.
 - `sensor.alexela_electricity_next_bill_due_date`: earliest known payment deadline
   among unpaid bills, including overdue bills. Unknown when none is available.
+- `sensor.alexela_electricity_last_bill`: the invoiced total in EUR, paid or
+  not, for the latest month an invoice period starts in. Its `bill_history`
+  attribute lists every such month Alexela returns (oldest first), keyed by the
+  invoice's `periodStart`, with the summed invoice `sum` as `amount` and the bill
+  numbers; credit notes net against their month.
 
 Balances use `unpaid`, so partially paid invoices show only the amount still
 owed. Credit balances are not subtracted from other unpaid invoices. The due
