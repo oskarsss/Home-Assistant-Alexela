@@ -38,6 +38,17 @@ def bill_history(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def billed_in_year(history: list[dict[str, Any]], year: int) -> float:
+    """Bills count toward the year their invoice period starts in, not the issue date."""
+    prefix = f"{year}-"
+    total = sum(
+        (Decimal(str(entry["amount"])) for entry in history
+         if str(entry.get("month", "")).startswith(prefix)),
+        Decimal(0),
+    )
+    return float(total)
+
+
 def summarize_invoices(items: list[dict[str, Any]], today: date) -> dict[str, Any]:
     """Use the remaining balance, including partial payments and credit notes.
 

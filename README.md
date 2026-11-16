@@ -47,6 +47,8 @@ fetching all pages from 2000-01-01 through today in Europe/Riga. It provides:
   attribute lists every such month Alexela returns (oldest first), keyed by the
   invoice's `periodStart`, with the summed invoice `sum` as `amount` and the bill
   numbers; credit notes net against their month.
+- `sensor.alexela_electricity_billed_this_year`: the sum of those monthly
+  totals for the current year in Europe/Riga, by the same invoice period month.
 
 Balances use `unpaid`, so partially paid invoices show only the amount still
 owed. Credit balances are not subtracted from other unpaid invoices. The due

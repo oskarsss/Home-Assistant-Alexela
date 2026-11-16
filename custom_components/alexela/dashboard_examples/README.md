@@ -15,9 +15,9 @@ current Home Assistant `sections` layout:
   fixed-vs-Nord-Pool comparison, and clearly scoped price tiles.
 - **Analytics** — clearly separated Historical consumption, Bills,
   Nord Pool comparison, and Nord Pool prices groups. Bills shows the
-  estimated and last bill, any unpaid amount, and a 12-month chart of actual
-  invoiced bills (plus the current estimate) by the month each invoice period
-  starts in. Month-over-month and
+  estimated and last bill, the year's billed total, any unpaid amount, and a
+  12-month chart of actual invoiced bills (plus the current estimate) by the
+  month each invoice period starts in. Month-over-month and
   year-over-year statistic cards, plus monthly average/minimum/maximum cards,
   are paired with monthly, annual, daily, and cumulative graphs as history grows.
 

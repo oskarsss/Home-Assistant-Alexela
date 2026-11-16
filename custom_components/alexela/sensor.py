@@ -30,7 +30,7 @@ from .const import (
     SNAPSHOT_KEY,
 )
 from .coordinator import AlexelaCoordinator
-from .invoices import INVOICE_SUMMARY_KEY
+from .invoices import INVOICE_SUMMARY_KEY, billed_in_year
 from .parsing import reference_datetime, sum_rows, total_block
 from .statistics import NORD_POOL_SUMMARY_KEY
 
@@ -39,6 +39,13 @@ ValueFn = Callable[[dict[str, Any]], float | Decimal | date | None]
 
 def _invoice_value(data: dict[str, Any], key: str) -> Any:
     return data.get(INVOICE_SUMMARY_KEY, {}).get(key)
+
+
+def _billed_this_year(data: dict[str, Any]) -> float | None:
+    history = _invoice_value(data, "bill_history")
+    if history is None:
+        return None
+    return billed_in_year(history, datetime.now(ZoneInfo(PORTAL_TIME_ZONE)).year)
 
 
 def _invoice_due_date(data: dict[str, Any]) -> date | None:
@@ -227,6 +234,7 @@ INVOICE_SENSOR_KEYS = frozenset(
         "electricity_unpaid_amount",
         "electricity_next_bill_due_date",
         "electricity_last_bill",
+        "electricity_billed_this_year",
     }
 )
 # Values named after the current month or year. A stale cache must not show
@@ -292,6 +300,13 @@ SENSORS: tuple[AlexelaSensorDescription, ...] = (
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="EUR", suggested_display_precision=2,
         value_fn=lambda data: _invoice_value(data, "last_bill_amount"),
+    ),
+    AlexelaSensorDescription(
+        key="electricity_billed_this_year", name="Electricity billed this year",
+        icon="mdi:cash-multiple",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="EUR", suggested_display_precision=2,
+        value_fn=_billed_this_year,
     ),
     AlexelaSensorDescription(
         key="electricity_ytd",

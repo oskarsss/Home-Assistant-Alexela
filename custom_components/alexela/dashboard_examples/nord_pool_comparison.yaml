@@ -476,11 +476,18 @@ views:
               columns: 6
               rows: 2
           - type: entity
+            entity: sensor.alexela_electricity_billed_this_year
+            name: This year
+            icon: mdi:calendar
+            grid_options:
+              columns: 6
+              rows: 2
+          - type: entity
             entity: sensor.alexela_electricity_unpaid_amount
             name: Unpaid
             icon: mdi:cash-clock
             grid_options:
-              columns: 12
+              columns: 6
               rows: 2
           - type: custom:apexcharts-card
             graph_span: 12month
